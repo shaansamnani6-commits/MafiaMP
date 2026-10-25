@@ -526,6 +526,7 @@
                 return;
             }
 
+            await initFirebase();
             isHost = true;
             roomCode = generateRoomCode();
             myPlayerId = 0;
@@ -551,7 +552,7 @@
 
                     listenToOnlineRoom();
                 } catch (e) {
-                    console.log("Created lobby in room mode");
+                    console.error("Error creating room document:", e);
                 }
             }
 
@@ -571,6 +572,7 @@
                 return;
             }
 
+            await initFirebase();
             isHost = false;
             roomCode = code;
 
@@ -619,6 +621,7 @@
                 document.getElementById('localPlayerInputBox').classList.add('hidden');
                 switchScreen('setupScreen');
             } catch (err) {
+                console.error("Join room error:", err);
                 alert('Could not join room. Please verify room code and internet connection.');
             }
         }
