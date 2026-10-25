@@ -355,7 +355,7 @@
             </div>
 
             <button id="nextRoundBtn" onclick="continueAfterRound()" class="w-full py-4 rounded-2xl bg-teal-500 hover:bg-teal-600 text-white font-extrabold text-base shadow-lg shadow-teal-500/25 active:scale-98 transition-all">
-                Next Round (Reshuffle Roles)
+                Next Discussion Phase
             </button>
         </div>
 
@@ -755,7 +755,7 @@
             );
         }
 
-        // --- HELPER LOGIC: RESHUFFLE ROLES EACH ROUND ---
+        // --- HELPER LOGIC: INITIAL ROLE ASSIGNMENT ---
         function assignShuffledRoles(playerList) {
             const count = playerList.length;
             const mafiaNum = Math.ceil(count / 3);
@@ -765,7 +765,8 @@
 
             return playerList.map((p, i) => ({
                 ...p,
-                role: p.isAlive ? roles[i] : 'Civilian',
+                role: roles[i],
+                isAlive: true,
                 seenRole: false
             }));
         }
@@ -775,7 +776,7 @@
             forfeitEnabled = document.getElementById('forfeitsCheckbox').checked;
 
             if (gameMode === 'local') {
-                let initialPlayers = playerNames.map((name, i) => ({ id: i, name: name, isAlive: true }));
+                let initialPlayers = playerNames.map((name, i) => ({ id: i, name: name }));
                 players = assignShuffledRoles(initialPlayers);
                 switchScreen('roleDistributionScreen');
                 renderRoleDistributionGrid();
@@ -1176,19 +1177,8 @@
                     await updateDoc(roomRef, { status: 'gameover', winner: winner });
                 }
             } else {
-                players = assignShuffledRoles(players);
-
-                if (gameMode === 'local') {
-                    switchScreen('roleDistributionScreen');
-                    renderRoleDistributionGrid();
-                } else if (gameMode === 'online' && isHost) {
-                    const { doc, updateDoc } = window.firebaseImports;
-                    const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomCode);
-                    await updateDoc(roomRef, {
-                        status: 'roles',
-                        players: players
-                    });
-                }
+                // Continue to next discussion phase while maintaining current roles
+                startDiscussionPhase();
             }
         }
 
@@ -1232,19 +1222,18 @@
         }
 
         async function resetGameSamePlayers() {
-            players = players.map(p => ({ ...p, isAlive: true }));
+            let basePlayers = players.map(p => ({ id: p.id, name: p.name }));
+            players = assignShuffledRoles(basePlayers);
 
             if (gameMode === 'local') {
-                players = assignShuffledRoles(players);
                 switchScreen('roleDistributionScreen');
                 renderRoleDistributionGrid();
             } else if (gameMode === 'online' && isHost) {
-                const assigned = assignShuffledRoles(players);
                 const { doc, updateDoc } = window.firebaseImports;
                 const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomCode);
                 await updateDoc(roomRef, {
                     status: 'roles',
-                    players: assigned
+                    players: players
                 });
             }
         }
