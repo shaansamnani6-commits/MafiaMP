@@ -1,8 +1,8 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Mafia: Party Edition</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -25,30 +25,60 @@
                             500: '#f43f5e',
                             600: '#e11d48',
                             700: '#be123c',
+                        },
+                        amber: {
+                            400: '#fbbf24',
+                            500: '#f59e0b',
                         }
+                    },
+                    animation: {
+                        'pulse-fast': 'pulse 1.2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'bounce-short': 'bounce 0.8s infinite',
                     }
                 }
             }
         }
     </script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800;900&display=swap');
+        
+        * {
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+        }
+
         body {
             font-family: 'Plus Jakarta Sans', sans-serif;
             touch-action: manipulation;
+            background-color: #030712;
+            color: #f8fafc;
         }
+
         .custom-scrollbar::-webkit-scrollbar {
-            width: 6px;
+            width: 5px;
         }
         .custom-scrollbar::-webkit-scrollbar-track {
-            background: rgba(0, 0, 0, 0.05);
+            background: rgba(255, 255, 255, 0.03);
         }
         .custom-scrollbar::-webkit-scrollbar-thumb {
             background: rgba(20, 184, 166, 0.4);
             border-radius: 9999px;
         }
+
+        /* Card blur glassmorphism effect */
+        .glass-card {
+            background: rgba(15, 23, 42, 0.75);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .light .glass-card {
+            background: rgba(255, 255, 255, 0.85);
+            border: 1px solid rgba(0, 0, 0, 0.08);
+        }
     </style>
-    <!-- Firebase Standard Web SDKs -->
+    <!-- Firebase SDK Imports -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
@@ -60,308 +90,313 @@
         };
     </script>
 </head>
-<body class="bg-slate-100 text-slate-800 dark:bg-navy-950 dark:text-slate-100 min-h-screen flex flex-col justify-between transition-colors duration-300">
+<body class="bg-slate-900 text-slate-100 dark:bg-navy-950 min-h-screen flex flex-col justify-between transition-colors duration-300">
 
     <!-- Header Navigation -->
-    <header class="w-full max-w-md mx-auto p-4 flex justify-between items-center z-10">
-        <div class="flex items-center gap-2">
-            <!-- Game Logo Graphics -->
-            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-teal-500 to-rose-600 flex items-center justify-center shadow-lg shadow-teal-500/20">
+    <header class="w-full max-w-md mx-auto p-4 flex justify-between items-center z-20 sticky top-0 backdrop-blur-md">
+        <div class="flex items-center gap-2.5">
+            <div class="w-10 h-10 rounded-2xl bg-gradient-to-br from-teal-400 via-teal-600 to-rose-600 flex items-center justify-center shadow-lg shadow-teal-500/20 ring-2 ring-white/10">
                 <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457-.39-2.823-1.07-4"></path>
                 </svg>
             </div>
             <div>
-                <h1 class="font-extrabold text-lg leading-none tracking-tight">MAFIA</h1>
-                <span class="text-xs font-bold text-teal-500 uppercase tracking-widest">Party Edition</span>
+                <h1 class="font-black text-lg leading-none tracking-tight bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">MAFIA</h1>
+                <span class="text-[10px] font-extrabold text-teal-400 uppercase tracking-widest block">Party Edition</span>
             </div>
         </div>
 
-        <!-- Room Code Display (Multiplayer) -->
-        <div id="roomBadge" class="hidden px-3 py-1 rounded-xl bg-teal-500/10 border border-teal-500/20 text-teal-500 font-extrabold text-xs">
-            ROOM: <span id="roomCodeDisplay">--</span>
+        <!-- Room Badge (Online Mode) -->
+        <div id="roomBadge" class="hidden px-3 py-1.5 rounded-xl bg-teal-500/10 border border-teal-500/30 text-teal-400 font-black text-xs tracking-wider flex items-center gap-1.5 shadow-sm">
+            <span class="w-2 h-2 rounded-full bg-teal-400 animate-pulse"></span>
+            ROOM: <span id="roomCodeDisplay">----</span>
         </div>
 
-        <!-- Dark/Light Theme Toggle Switch -->
-        <button id="themeToggleBtn" onclick="toggleTheme()" class="p-2.5 rounded-xl bg-white dark:bg-navy-800 shadow-md border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:scale-105 active:scale-95 transition-all">
+        <!-- Theme Toggle -->
+        <button id="themeToggleBtn" onclick="toggleTheme()" class="p-2.5 rounded-2xl bg-white/5 border border-white/10 text-slate-300 hover:text-white hover:bg-white/10 active:scale-95 transition-all">
             <svg id="sunIcon" class="w-5 h-5 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
             <svg id="moonIcon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path></svg>
         </button>
     </header>
 
-    <!-- Main Dynamic View Container -->
+    <!-- Main Dynamic Screen Host -->
     <main class="w-full max-w-md mx-auto p-4 flex-1 flex flex-col justify-center">
-        
-        <!-- Screen 0: MODE SELECTION -->
-        <div id="modeSelectScreen" class="space-y-5 animate-fade-in text-center">
+
+        <!-- SCREEN 0: MODE SELECTION -->
+        <div id="modeSelectScreen" class="space-y-6 text-center animate-fade-in">
             <div class="space-y-2">
-                <h2 class="text-3xl font-black text-slate-800 dark:text-white">Choose Mode</h2>
-                <p class="text-xs text-slate-500 dark:text-slate-400">Play together on one phone or join on separate devices</p>
+                <h2 class="text-3xl font-black tracking-tight">Select Game Mode</h2>
+                <p class="text-xs text-slate-400 max-w-xs mx-auto">Play together around one phone or connect with multiple devices.</p>
             </div>
 
             <div class="grid grid-cols-1 gap-4">
-                <button onclick="selectGameMode('local')" class="p-6 rounded-3xl bg-white dark:bg-navy-900 border border-slate-200 dark:border-slate-800 shadow-xl hover:border-teal-500 text-left space-y-2 active:scale-98 transition-all">
+                <button onclick="selectGameMode('local')" class="glass-card p-6 rounded-3xl hover:border-teal-500/50 text-left space-y-2 active:scale-98 transition-all group relative overflow-hidden">
                     <div class="flex items-center justify-between">
-                        <span class="text-lg font-black text-slate-800 dark:text-white">📱 Pass-the-Phone</span>
-                        <span class="text-xs font-bold px-2.5 py-1 rounded-full bg-teal-500/10 text-teal-500">1 Device</span>
+                        <span class="text-lg font-black text-white group-hover:text-teal-400 transition-colors">📱 Pass-the-Phone</span>
+                        <span class="text-[10px] font-extrabold px-3 py-1 rounded-full bg-teal-500/10 text-teal-400 border border-teal-500/20">1 Device</span>
                     </div>
-                    <p class="text-xs text-slate-500 dark:text-slate-400">Pass one phone around the room for secret roles and votes.</p>
+                    <p class="text-xs text-slate-400 leading-relaxed">Pass one phone around the circle to privately view secret roles and cast secret ballots.</p>
                 </button>
 
-                <button onclick="selectGameMode('online')" class="p-6 rounded-3xl bg-white dark:bg-navy-900 border border-slate-200 dark:border-slate-800 shadow-xl hover:border-teal-500 text-left space-y-2 active:scale-98 transition-all">
+                <button onclick="selectGameMode('online')" class="glass-card p-6 rounded-3xl hover:border-rose-500/50 text-left space-y-2 active:scale-98 transition-all group relative overflow-hidden">
                     <div class="flex items-center justify-between">
-                        <span class="text-lg font-black text-slate-800 dark:text-white">🌐 Online Room</span>
-                        <span class="text-xs font-bold px-2.5 py-1 rounded-full bg-rose-500/10 text-rose-500">Multi-Device</span>
+                        <span class="text-lg font-black text-white group-hover:text-rose-400 transition-colors">🌐 Online Room</span>
+                        <span class="text-[10px] font-extrabold px-3 py-1 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20">Multi-Device</span>
                     </div>
-                    <p class="text-xs text-slate-500 dark:text-slate-400">Host or join with a 4-letter code on separate phones.</p>
+                    <p class="text-xs text-slate-400 leading-relaxed">Host or join a game with a 4-letter code using your own phone screen.</p>
                 </button>
             </div>
         </div>
 
-        <!-- Screen 0B: ONLINE LOBBY CHOICE -->
-        <div id="onlineLobbyChoiceScreen" class="hidden space-y-5 animate-fade-in text-center">
-            <div class="space-y-2">
-                <h2 class="text-2xl font-black text-slate-800 dark:text-white">Online Lobby</h2>
-                <p class="text-xs text-slate-500 dark:text-slate-400">Create a room as host or join a friend's room</p>
+        <!-- SCREEN 0B: ONLINE LOBBY MENU -->
+        <div id="onlineLobbyChoiceScreen" class="hidden space-y-5 text-center">
+            <div class="space-y-1">
+                <h2 class="text-2xl font-black">Online Lobby</h2>
+                <p class="text-xs text-slate-400">Join a friend's room or host a new room</p>
             </div>
 
-            <div class="bg-white dark:bg-navy-900 p-6 rounded-3xl shadow-xl border border-slate-200 dark:border-slate-800 space-y-4">
-                <input type="text" id="myPlayerNameInput" placeholder="Enter your name..." maxlength="16" class="w-full px-4 py-3 rounded-xl bg-slate-100 dark:bg-navy-800 text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-500 text-sm font-semibold">
+            <div class="glass-card p-6 rounded-3xl space-y-4 shadow-2xl">
+                <div>
+                    <label class="block text-left text-xs font-bold text-slate-400 mb-1.5 uppercase tracking-wider">Your Nickname</label>
+                    <input type="text" id="myPlayerNameInput" placeholder="Enter your name..." maxlength="14" class="w-full px-4 py-3.5 rounded-2xl bg-white/5 border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-teal-500 text-sm font-semibold transition-all">
+                </div>
 
                 <div class="grid grid-cols-2 gap-3 pt-2">
-                    <button onclick="createOnlineRoom()" class="py-3.5 rounded-2xl bg-teal-500 hover:bg-teal-600 text-white font-extrabold text-sm shadow-md active:scale-95 transition-all">
+                    <button onclick="createOnlineRoom()" class="py-3.5 rounded-2xl bg-gradient-to-r from-teal-500 to-teal-600 hover:from-teal-600 hover:to-teal-700 text-white font-black text-sm shadow-lg shadow-teal-500/20 active:scale-95 transition-all">
                         Create Room
                     </button>
-                    <button onclick="showJoinRoomUI()" class="py-3.5 rounded-2xl bg-slate-200 dark:bg-navy-800 text-slate-800 dark:text-white font-extrabold text-sm active:scale-95 transition-all">
+                    <button onclick="showJoinRoomUI()" class="py-3.5 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 text-white font-black text-sm active:scale-95 transition-all">
                         Join Room
                     </button>
                 </div>
 
                 <!-- Join Code Input Box -->
-                <div id="joinCodeBox" class="hidden space-y-3 pt-3 border-t border-slate-100 dark:border-slate-800">
-                    <input type="text" id="roomCodeInput" uppercase placeholder="Enter 4-Letter Code" maxlength="4" class="w-full px-4 py-3 rounded-xl bg-slate-100 dark:bg-navy-800 text-slate-800 dark:text-white uppercase tracking-widest text-center font-black text-lg focus:outline-none focus:ring-2 focus:ring-rose-500">
-                    <button onclick="joinOnlineRoom()" class="w-full py-3.5 rounded-2xl bg-rose-500 hover:bg-rose-600 text-white font-extrabold text-sm shadow-md active:scale-95 transition-all">
+                <div id="joinCodeBox" class="hidden space-y-3 pt-3 border-t border-white/10">
+                    <label class="block text-left text-xs font-bold text-slate-400 mb-1 uppercase tracking-wider">Room Code</label>
+                    <input type="text" id="roomCodeInput" placeholder="4-LETTER CODE" maxlength="4" class="w-full px-4 py-3 rounded-2xl bg-white/5 border border-white/10 text-teal-400 uppercase tracking-widest text-center font-black text-xl focus:outline-none focus:ring-2 focus:ring-rose-500">
+                    <button onclick="joinOnlineRoom()" class="w-full py-3.5 rounded-2xl bg-rose-500 hover:bg-rose-600 text-white font-black text-sm shadow-lg shadow-rose-500/20 active:scale-95 transition-all">
                         Connect To Room
                     </button>
                 </div>
             </div>
 
-            <button onclick="switchScreen('modeSelectScreen')" class="text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+            <button onclick="switchScreen('modeSelectScreen')" class="text-xs font-bold text-slate-400 hover:text-white transition-colors">
                 ← Back to Mode Selection
             </button>
         </div>
 
-        <!-- Screen 1: SETUP (LOCAL / ONLINE HOST) -->
-        <div id="setupScreen" class="hidden space-y-5 animate-fade-in">
+        <!-- SCREEN 1: SETUP (LOCAL OR MULTIPLAYER HOST) -->
+        <div id="setupScreen" class="hidden space-y-5">
             <div class="text-center space-y-1">
-                <h2 id="setupTitle" class="text-2xl font-black text-slate-800 dark:text-white">Player Setup</h2>
-                <p id="setupSubtitle" class="text-xs text-slate-500 dark:text-slate-400">Add 5 to 12 player names to begin</p>
+                <h2 id="setupTitle" class="text-2xl font-black">Player Setup</h2>
+                <p id="setupSubtitle" class="text-xs text-slate-400">Add 5 to 12 players to start</p>
             </div>
 
             <!-- Input Box -->
-            <div id="localPlayerInputBox" class="bg-white dark:bg-navy-900 p-4 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 space-y-4">
+            <div id="localPlayerInputBox" class="glass-card p-4 rounded-3xl space-y-4">
                 <form onsubmit="handleAddPlayer(event)" class="flex gap-2">
-                    <input type="text" id="playerNameInput" placeholder="Enter player name..." maxlength="16" class="flex-1 px-4 py-3 rounded-xl bg-slate-100 dark:bg-navy-800 text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-500 text-sm font-semibold">
-                    <button type="submit" class="px-5 py-3 rounded-xl bg-teal-500 hover:bg-teal-600 text-white font-bold text-sm shadow-md shadow-teal-500/30 active:scale-95 transition-all">
+                    <input type="text" id="playerNameInput" placeholder="Player name..." maxlength="14" class="flex-1 px-4 py-3 rounded-2xl bg-white/5 border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-teal-500 text-sm font-semibold">
+                    <button type="submit" class="px-5 py-3 rounded-2xl bg-teal-500 hover:bg-teal-600 text-white font-black text-sm shadow-md shadow-teal-500/20 active:scale-95 transition-all">
                         Add
                     </button>
                 </form>
 
-                <!-- Feedback Banner -->
-                <div id="setupFeedback" class="hidden text-xs text-rose-500 font-bold px-1"></div>
+                <div id="setupFeedback" class="hidden text-xs text-rose-400 font-bold px-1"></div>
 
-                <!-- Players List -->
-                <div class="space-y-2 max-h-56 overflow-y-auto custom-scrollbar pr-1" id="playerList">
+                <!-- Players Roster List -->
+                <div class="space-y-2 max-h-52 overflow-y-auto custom-scrollbar pr-1" id="playerList">
                     <!-- Populated via JS -->
                 </div>
 
-                <div class="pt-2 border-t border-slate-100 dark:border-slate-800 flex justify-between items-center text-xs text-slate-500 dark:text-slate-400 font-medium">
-                    <span>Total: <strong id="playerCount" class="text-teal-500">0</strong> / 12</span>
-                    <span>Mafia: <strong id="mafiaCount" class="text-rose-500">0</strong></span>
+                <div class="pt-2 border-t border-white/10 flex justify-between items-center text-xs text-slate-400 font-semibold">
+                    <span>Players: <strong id="playerCount" class="text-teal-400">0</strong> / 12</span>
+                    <span>Mafia Count: <strong id="mafiaCount" class="text-rose-400">0</strong></span>
                 </div>
             </div>
 
             <!-- Options Box -->
-            <div class="bg-white dark:bg-navy-900 p-4 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800">
+            <div class="glass-card p-4 rounded-2xl">
                 <label class="flex items-center gap-3 cursor-pointer select-none">
-                    <input type="checkbox" id="forfeitsCheckbox" class="w-5 h-5 rounded text-teal-500 focus:ring-teal-500 dark:bg-navy-800 border-slate-300 dark:border-slate-700" checked>
+                    <input type="checkbox" id="forfeitsCheckbox" class="w-5 h-5 rounded-lg bg-white/5 border-white/20 text-teal-500 focus:ring-teal-500" checked>
                     <div>
-                        <span class="block text-sm font-bold text-slate-800 dark:text-white">Enable Funny Forfeits</span>
-                        <span class="block text-xs text-slate-500 dark:text-slate-400">Eliminated players perform a task when voted out</span>
+                        <span class="block text-sm font-bold text-white">Enable Funny Forfeits</span>
+                        <span class="block text-[11px] text-slate-400">Eliminated players must perform a lighthearted challenge</span>
                     </div>
                 </label>
             </div>
 
-            <!-- Start Button -->
-            <button id="startGameBtn" onclick="startGame()" disabled class="w-full py-4 rounded-2xl bg-gradient-to-r from-teal-500 to-teal-600 disabled:opacity-40 disabled:cursor-not-allowed text-white font-extrabold text-base shadow-lg shadow-teal-500/25 active:scale-98 transition-all">
+            <!-- Start Action Button -->
+            <button id="startGameBtn" onclick="startGame()" disabled class="w-full py-4 rounded-2xl bg-gradient-to-r from-teal-500 to-teal-600 hover:from-teal-600 hover:to-teal-700 disabled:opacity-30 disabled:cursor-not-allowed text-white font-black text-base shadow-xl shadow-teal-500/20 active:scale-98 transition-all">
                 Start Game
             </button>
         </div>
 
-        <!-- Screen 2: PASS PHONE & ROLE DISTRIBUTION -->
-        <div id="roleDistributionScreen" class="hidden space-y-6 text-center animate-fade-in">
-            <div class="space-y-2">
-                <span class="px-3 py-1 rounded-full bg-teal-500/10 text-teal-500 font-bold text-xs uppercase tracking-wider">Secret Roles</span>
-                <h2 id="roleScreenTitle" class="text-2xl font-black text-slate-800 dark:text-white">Pass the Phone</h2>
-                <p id="roleScreenSubtitle" class="text-xs text-slate-500 dark:text-slate-400">Each player must tap their name privately to see their secret role.</p>
+        <!-- SCREEN 2: ROLE DISTRIBUTION -->
+        <div id="roleDistributionScreen" class="hidden space-y-6 text-center">
+            <div class="space-y-1">
+                <span class="px-3 py-1 rounded-full bg-teal-500/10 border border-teal-500/20 text-teal-400 font-bold text-[10px] uppercase tracking-widest">Secret Assignment</span>
+                <h2 id="roleScreenTitle" class="text-2xl font-black">Pass the Phone</h2>
+                <p id="roleScreenSubtitle" class="text-xs text-slate-400 max-w-xs mx-auto">Tap your name to secretly view your role.</p>
             </div>
 
-            <div id="rolePlayerGrid" class="grid grid-cols-2 gap-3">
-                <!-- Buttons for each player generated dynamically -->
+            <div id="rolePlayerGrid" class="grid grid-cols-2 gap-3 max-h-72 overflow-y-auto custom-scrollbar p-1">
+                <!-- Dynamic Player Role Cards -->
             </div>
 
-            <!-- Role Modal Reveal -->
-            <div id="roleRevealModal" class="hidden fixed inset-0 bg-navy-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
-                <div id="modalContentCard" class="bg-white dark:bg-navy-900 w-full max-w-xs p-6 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 text-center space-y-5 transform transition-all scale-100">
-                    <div id="roleModalHeader" class="space-y-1">
-                        <h3 id="modalPlayerName" class="text-xl font-black text-slate-800 dark:text-white">Player</h3>
-                        <p class="text-xs text-slate-400">Your Confidential Role</p>
+            <!-- Role Reveal Modal Dialog -->
+            <div id="roleRevealModal" class="hidden fixed inset-0 bg-navy-950/90 backdrop-blur-xl z-50 flex items-center justify-center p-4">
+                <div class="glass-card w-full max-w-xs p-6 rounded-3xl shadow-2xl border border-white/10 text-center space-y-5 animate-bounce-short">
+                    <div>
+                        <h3 id="modalPlayerName" class="text-xl font-black text-white">Player</h3>
+                        <p class="text-[11px] text-slate-400 uppercase tracking-widest">Confidential Identity</p>
                     </div>
 
-                    <!-- Role Card Graphic -->
-                    <div id="roleGraphicBox" class="py-8 px-4 rounded-2xl flex flex-col items-center justify-center gap-3 transition-all">
+                    <!-- Role Graphic Card -->
+                    <div id="roleGraphicBox" class="py-6 px-4 rounded-2xl flex flex-col items-center justify-center gap-3 transition-all">
                         <div id="roleIcon" class="w-16 h-16 flex items-center justify-center"></div>
                         <h4 id="roleTitle" class="text-2xl font-black tracking-wider uppercase">ROLE</h4>
                     </div>
 
-                    <!-- Mafia Details List -->
-                    <div id="mafiaTeammatesBox" class="hidden p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-xs text-left space-y-1">
-                        <span class="font-bold text-rose-500 block">Fellow Mafia Members:</span>
-                        <div id="mafiaTeammatesList" class="text-slate-700 dark:text-slate-300 font-semibold"></div>
+                    <!-- Mafia Teammates Indicator -->
+                    <div id="mafiaTeammatesBox" class="hidden p-3 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-xs text-left space-y-1">
+                        <span class="font-bold text-rose-400 block">Fellow Mafia Teammates:</span>
+                        <div id="mafiaTeammatesList" class="text-slate-200 font-semibold"></div>
                     </div>
 
-                    <button onclick="hideRoleModal()" class="w-full py-3.5 rounded-xl bg-slate-800 dark:bg-slate-100 text-white dark:text-slate-900 font-extrabold text-sm shadow-md active:scale-95 transition-all">
-                        I Understand, Hide Role
+                    <button onclick="hideRoleModal()" class="w-full py-3.5 rounded-2xl bg-white text-slate-900 hover:bg-slate-100 font-black text-sm shadow-lg active:scale-95 transition-all">
+                        Hide & Keep Secret
                     </button>
                 </div>
             </div>
 
-            <button id="startDiscussionBtn" onclick="startDiscussionPhase()" disabled class="w-full py-4 rounded-2xl bg-gradient-to-r from-teal-500 to-teal-600 disabled:opacity-40 text-white font-extrabold text-base shadow-lg shadow-teal-500/25 active:scale-98 transition-all">
+            <button id="startDiscussionBtn" onclick="startDiscussionPhase()" disabled class="w-full py-4 rounded-2xl bg-gradient-to-r from-teal-500 to-teal-600 disabled:opacity-30 text-white font-black text-base shadow-xl shadow-teal-500/20 active:scale-98 transition-all">
                 Everyone Has Seen Role (Begin)
             </button>
         </div>
 
-        <!-- Screen 3: DISCUSSION PHASE -->
-        <div id="discussionScreen" class="hidden space-y-5 animate-fade-in">
-            <div class="flex justify-between items-center bg-white dark:bg-navy-900 p-3 rounded-2xl border border-slate-200 dark:border-slate-800">
+        <!-- SCREEN 3: DISCUSSION PHASE -->
+        <div id="discussionScreen" class="hidden space-y-5">
+            <div class="flex justify-between items-center glass-card p-3.5 rounded-2xl">
                 <div class="flex items-center gap-2">
-                    <div class="w-3 h-3 rounded-full bg-teal-500 animate-pulse"></div>
-                    <span class="text-xs font-bold text-slate-600 dark:text-slate-300">Phase: Discussion</span>
+                    <span class="w-3 h-3 rounded-full bg-teal-400 animate-pulse"></span>
+                    <span class="text-xs font-bold text-slate-300">Phase: Discussion</span>
                 </div>
-                <div class="text-xs font-extrabold">
-                    <span class="text-rose-500" id="discussionMafiaRemaining">0 Mafia</span> Still Hiding
+                <div class="text-xs font-black">
+                    <span class="text-rose-400" id="discussionMafiaRemaining">0 Mafia</span> Still Hiding
                 </div>
             </div>
 
-            <!-- Discussion Prompt Card -->
-            <div class="bg-gradient-to-br from-white to-slate-50 dark:from-navy-900 dark:to-navy-800 p-6 rounded-3xl shadow-xl border border-slate-200 dark:border-slate-800 text-center space-y-4">
-                <div class="inline-flex p-3 rounded-2xl bg-teal-500/10 text-teal-500">
-                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 8 9 8z"></path></svg>
+            <!-- Observational Prompt Card -->
+            <div class="glass-card p-6 rounded-3xl text-center space-y-4 relative overflow-hidden border border-teal-500/20">
+                <div class="inline-flex p-3 rounded-2xl bg-teal-500/10 text-teal-400 border border-teal-500/20">
+                    <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 8 9 8z"></path></svg>
                 </div>
-                <h3 id="promptText" class="text-lg font-extrabold text-slate-800 dark:text-white leading-snug">
-                    Prompt generating...
+                <h3 id="promptText" class="text-lg font-black text-white leading-snug">
+                    Loading observational prompt...
                 </h3>
-                <button id="newPromptBtn" onclick="generateNewPrompt()" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-100 dark:bg-navy-800 text-teal-500 font-bold text-xs hover:bg-slate-200 dark:hover:bg-slate-800 transition-all">
+                <button id="newPromptBtn" onclick="generateNewPrompt()" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-teal-400 font-bold text-xs hover:bg-white/10 active:scale-95 transition-all">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
                     New Prompt
                 </button>
             </div>
 
-            <!-- Alive Players Overview -->
+            <!-- Alive Roster Overview -->
             <div class="space-y-2">
-                <span class="text-xs font-bold text-slate-400 uppercase tracking-wider block px-1">Players Still In Game</span>
+                <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block px-1">Active Suspects</span>
                 <div id="alivePlayersList" class="flex flex-wrap gap-2">
                     <!-- Dynamic badges -->
                 </div>
             </div>
 
-            <button id="startVotingBtn" onclick="startVotingPhase()" class="w-full py-4 rounded-2xl bg-gradient-to-r from-rose-500 to-rose-600 text-white font-extrabold text-base shadow-lg shadow-rose-500/25 active:scale-98 transition-all">
+            <button id="startVotingBtn" onclick="startVotingPhase()" class="w-full py-4 rounded-2xl bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-600 hover:to-rose-700 text-white font-black text-base shadow-xl shadow-rose-500/20 active:scale-98 transition-all">
                 Proceed To Voting
             </button>
         </div>
 
-        <!-- Screen 4: VOTING PHASE -->
-        <div id="votingScreen" class="hidden space-y-6 text-center animate-fade-in">
-            <!-- Local Pass Phone Intermediate View -->
-            <div id="votingPassPhoneState" class="space-y-6 py-8">
-                <div class="w-20 h-20 mx-auto rounded-3xl bg-teal-500/10 flex items-center justify-center text-teal-500">
+        <!-- SCREEN 4: VOTING PHASE -->
+        <div id="votingScreen" class="hidden space-y-6 text-center">
+            <!-- Pass Phone Intermediate Screen (Local Mode) -->
+            <div id="votingPassPhoneState" class="space-y-6 py-6">
+                <div class="w-20 h-20 mx-auto rounded-3xl bg-teal-500/10 border border-teal-500/20 flex items-center justify-center text-teal-400">
                     <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
                 </div>
-                <div class="space-y-2">
-                    <p class="text-xs font-bold text-slate-400 uppercase tracking-widest">Secret Voting</p>
-                    <h2 class="text-3xl font-black text-slate-800 dark:text-white">Pass Phone To</h2>
-                    <h3 id="nextVoterName" class="text-2xl font-black text-teal-500">Player</h3>
+                <div class="space-y-1">
+                    <p class="text-xs font-bold text-slate-400 uppercase tracking-widest">Secret Ballot</p>
+                    <h2 class="text-2xl font-black">Pass Phone To</h2>
+                    <h3 id="nextVoterName" class="text-3xl font-black text-teal-400">Player</h3>
                 </div>
-                <button onclick="revealBallot()" class="w-full py-4 rounded-2xl bg-teal-500 hover:bg-teal-600 text-white font-extrabold text-base shadow-lg shadow-teal-500/25 active:scale-95 transition-all">
-                    I'm <span id="voterBtnName">Player</span>, Show My Ballot
+                <button onclick="revealBallot()" class="w-full py-4 rounded-2xl bg-teal-500 hover:bg-teal-600 text-white font-black text-base shadow-xl shadow-teal-500/20 active:scale-95 transition-all">
+                    I'm <span id="voterBtnName">Player</span>, Show Ballot
                 </button>
             </div>
 
-            <!-- Active Ballot View -->
+            <!-- Active Ballot Form State -->
             <div id="votingBallotState" class="hidden space-y-5 text-left">
                 <div class="text-center space-y-1">
-                    <span class="text-xs font-bold text-rose-500 uppercase tracking-widest">Cast Secret Ballot</span>
-                    <h3 class="text-xl font-black text-slate-800 dark:text-white"><span id="activeVoterTitle">Player</span>'s Vote</h3>
-                    <p class="text-xs text-slate-400">Choose who you suspect of being in the Mafia:</p>
+                    <span class="text-[11px] font-extrabold text-rose-400 uppercase tracking-widest">Cast Secret Vote</span>
+                    <h3 class="text-2xl font-black text-white"><span id="activeVoterTitle">Player</span>'s Ballot</h3>
+                    <p class="text-xs text-slate-400">Who do you suspect is in the Mafia?</p>
                 </div>
 
-                <div id="ballotOptionsList" class="space-y-2.5 max-h-64 overflow-y-auto custom-scrollbar pr-1">
-                    <!-- Dynamic radio-style options -->
+                <div id="ballotOptionsList" class="space-y-2.5 max-h-60 overflow-y-auto custom-scrollbar pr-1">
+                    <!-- Dynamic Ballot Radio Options -->
                 </div>
 
-                <button id="submitVoteBtn" onclick="submitVote()" disabled class="w-full py-4 rounded-2xl bg-rose-500 hover:bg-rose-600 disabled:opacity-40 text-white font-extrabold text-base shadow-lg shadow-rose-500/25 active:scale-98 transition-all">
+                <button id="submitVoteBtn" onclick="submitVote()" disabled class="w-full py-4 rounded-2xl bg-rose-500 hover:bg-rose-600 disabled:opacity-30 text-white font-black text-base shadow-xl shadow-rose-500/20 active:scale-98 transition-all">
                     Confirm Vote & Lock
                 </button>
             </div>
 
-            <!-- Online Waiting Banner -->
-            <div id="onlineWaitingVotesBanner" class="hidden py-8 space-y-3">
-                <div class="w-12 h-12 mx-auto rounded-full border-4 border-teal-500 border-t-transparent animate-spin"></div>
-                <p class="text-sm font-bold text-slate-800 dark:text-white">Waiting for all players to vote...</p>
-                <span id="voteProgressText" class="text-xs text-slate-400">0 / 0 votes submitted</span>
+            <!-- Online Multi-device Waiting Banner -->
+            <div id="onlineWaitingVotesBanner" class="hidden py-8 space-y-4">
+                <div class="w-14 h-14 mx-auto rounded-full border-4 border-teal-400 border-t-transparent animate-spin"></div>
+                <div class="space-y-1">
+                    <p class="text-base font-black text-white">Waiting for all votes to submit...</p>
+                    <span id="voteProgressText" class="text-xs text-slate-400 block">0 / 0 votes cast</span>
+                </div>
             </div>
         </div>
 
-        <!-- Screen 5: ROUND RESULT & ELIMINATION -->
-        <div id="roundResultScreen" class="hidden space-y-5 animate-fade-in">
+        <!-- SCREEN 5: ROUND RESULT & ELIMINATION -->
+        <div id="roundResultScreen" class="hidden space-y-5">
             <div class="text-center space-y-1">
-                <span class="px-3 py-1 rounded-full bg-slate-200 dark:bg-navy-800 text-slate-600 dark:text-slate-300 font-bold text-xs uppercase tracking-wider">Round Results</span>
-                <h2 class="text-2xl font-black text-slate-800 dark:text-white">Voting Summary</h2>
+                <span class="px-3 py-1 rounded-full bg-white/5 border border-white/10 text-slate-300 font-bold text-[10px] uppercase tracking-widest">Round Concluded</span>
+                <h2 class="text-2xl font-black">Voting Results</h2>
             </div>
 
-            <!-- Verdict Card -->
-            <div id="verdictCard" class="bg-white dark:bg-navy-900 p-6 rounded-3xl shadow-xl border border-slate-200 dark:border-slate-800 text-center space-y-4">
+            <!-- Verdict Display Card -->
+            <div id="verdictCard" class="glass-card p-6 rounded-3xl text-center space-y-4 border border-white/10">
                 <div id="verdictBadge" class="w-16 h-16 mx-auto rounded-2xl flex items-center justify-center"></div>
                 <div class="space-y-1">
-                    <h3 id="verdictTitle" class="text-2xl font-black text-slate-800 dark:text-white">Eliminated Player</h3>
-                    <p id="verdictSubtitle" class="text-xs font-bold text-slate-400">Role Revealed</p>
+                    <h3 id="verdictTitle" class="text-2xl font-black text-white">Result</h3>
+                    <p id="verdictSubtitle" class="text-xs font-bold text-slate-400">Identity Revealed</p>
                 </div>
 
-                <!-- Forfeit Box -->
+                <!-- Forfeit Display Container -->
                 <div id="forfeitContainer" class="hidden p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-center space-y-1">
-                    <span class="text-xs font-extrabold text-amber-500 uppercase tracking-wide flex items-center justify-center gap-1">
-                        ⚡ Funny Forfeit ⚡
+                    <span class="text-[11px] font-black text-amber-400 uppercase tracking-wider flex items-center justify-center gap-1">
+                        ⚡ Funny Forfeit Challenge ⚡
                     </span>
-                    <p id="forfeitText" class="text-sm font-bold text-slate-800 dark:text-slate-100"></p>
+                    <p id="forfeitText" class="text-xs font-bold text-slate-200"></p>
                 </div>
             </div>
 
-            <!-- Who Voted For Whom Breakdown -->
-            <div class="bg-white dark:bg-navy-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3">
-                <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Votes Breakdown</h4>
-                <div id="voteBreakdownList" class="space-y-2 max-h-48 overflow-y-auto custom-scrollbar text-xs font-semibold">
-                    <!-- List populated dynamically -->
+            <!-- Voting Breakdown List -->
+            <div class="glass-card p-4 rounded-2xl space-y-3">
+                <h4 class="text-[11px] font-black text-slate-400 uppercase tracking-wider">Ballot Breakdown</h4>
+                <div id="voteBreakdownList" class="space-y-2 max-h-40 overflow-y-auto custom-scrollbar text-xs font-semibold">
+                    <!-- Populated via JS -->
                 </div>
             </div>
 
-            <button id="nextRoundBtn" onclick="continueAfterRound()" class="w-full py-4 rounded-2xl bg-teal-500 hover:bg-teal-600 text-white font-extrabold text-base shadow-lg shadow-teal-500/25 active:scale-98 transition-all">
+            <button id="nextRoundBtn" onclick="continueAfterRound()" class="w-full py-4 rounded-2xl bg-gradient-to-r from-teal-500 to-teal-600 hover:from-teal-600 hover:to-teal-700 text-white font-black text-base shadow-xl shadow-teal-500/20 active:scale-98 transition-all">
                 Next Discussion Phase
             </button>
         </div>
 
-        <!-- Screen 6: GAME OVER SCREEN -->
-        <div id="gameOverScreen" class="hidden space-y-6 text-center animate-fade-in">
-            <div id="victoryHeader" class="bg-white dark:bg-navy-900 p-6 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 space-y-4">
+        <!-- SCREEN 6: GAME OVER SCREEN -->
+        <div id="gameOverScreen" class="hidden space-y-6 text-center">
+            <div id="victoryHeader" class="glass-card p-6 rounded-3xl space-y-4 border border-white/10">
                 <div id="victoryIcon" class="w-20 h-20 mx-auto rounded-3xl flex items-center justify-center"></div>
                 <div class="space-y-1">
                     <h2 id="victoryTitle" class="text-3xl font-black">CIVILIANS WIN!</h2>
@@ -369,35 +404,35 @@
                 </div>
             </div>
 
-            <!-- All Players Secret Roles Unveiled -->
-            <div class="bg-white dark:bg-navy-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3 text-left">
-                <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Final Roster & Roles</h4>
-                <div id="finalRosterList" class="space-y-2 max-h-52 overflow-y-auto custom-scrollbar">
-                    <!-- Revealed roles populated via JS -->
+            <!-- Final Revealed Roster -->
+            <div class="glass-card p-4 rounded-2xl space-y-3 text-left">
+                <h4 class="text-[11px] font-black text-slate-400 uppercase tracking-wider">Final Player Identities</h4>
+                <div id="finalRosterList" class="space-y-2 max-h-48 overflow-y-auto custom-scrollbar">
+                    <!-- Populated via JS -->
                 </div>
             </div>
 
-            <!-- Action Buttons -->
+            <!-- Play Again / Reset Options -->
             <div class="grid grid-cols-2 gap-3">
-                <button onclick="resetGameSamePlayers()" class="py-4 rounded-2xl bg-teal-500 hover:bg-teal-600 text-white font-extrabold text-sm shadow-lg shadow-teal-500/20 active:scale-95 transition-all">
+                <button onclick="resetGameSamePlayers()" class="py-4 rounded-2xl bg-teal-500 hover:bg-teal-600 text-white font-black text-sm shadow-xl shadow-teal-500/20 active:scale-95 transition-all">
                     Play Again
                 </button>
-                <button onclick="resetGameNewPlayers()" class="py-4 rounded-2xl bg-slate-200 dark:bg-navy-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-800 dark:text-white font-extrabold text-sm active:scale-95 transition-all">
-                    Change Players
+                <button onclick="resetGameNewPlayers()" class="py-4 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 text-white font-black text-sm active:scale-95 transition-all">
+                    Main Menu
                 </button>
             </div>
         </div>
 
     </main>
 
-    <!-- Footer Credit -->
-    <footer class="w-full max-w-md mx-auto p-4 text-center text-xs text-slate-400">
-        Mafia: Party Edition • Local & Online Deduction
+    <!-- Footer -->
+    <footer class="w-full max-w-md mx-auto p-4 text-center text-[11px] font-semibold text-slate-500">
+        Mafia: Party Edition • Pass-the-Phone & Multi-Device Deduction
     </footer>
 
-    <!-- JavaScript Game Logic Engine -->
+    <!-- Game Engine Logic -->
     <script>
-        // --- PROMPTS BANK (Observational Focus) ---
+        // Observational prompt dataset
         const PROMPT_TEMPLATES = [
             "Who made the most suspicious eye contact when the round started?",
             "Look around the circle right now. Who is smiling or smirking nervously?",
@@ -410,67 +445,56 @@
             "Who has the most unconvincing poker face right now?",
             "Who is fidgeting with their phone, hands, or clothes more than usual?",
             "Who suddenly went unusually quiet once this round started?",
-            "Look at the person across from you. Give them a 10-second staredown—did they break eye contact first?",
+            "Look at the person across from you. Give them a 5-second staredown—did they break eye contact first?",
             "Who reacted with the most nervous gasp or chuckle during setup?",
             "Who is crossing their arms or leaning back defensively?",
             "Who looks like they are trying too hard to stay neutral and blend into the background?"
         ];
 
-        // --- FUNNY FORFEITS BANK ---
+        // Funny forfeits dataset
         const FORFEITS_BANK = [
-            "Must talk in a dramatic whisper for the rest of the game.",
-            "Must keep your hands on top of your head until the game ends.",
-            "Must speak like a Victorian detective whenever you talk.",
-            "Must apologize dramatically to everyone before leaving the circle.",
-            "Must sit with your back to the group until a winner is declared.",
+            "Must speak in a dramatic whisper for the rest of the game.",
+            "Must keep both hands on top of your head until the game ends.",
+            "Must speak like a 1920s noir detective whenever you talk.",
+            "Must apologize dramatically to everyone before leaving the room.",
+            "Must sit facing away from the group until a winner is declared.",
             "Must gasp dramatically every time someone says the word 'Mafia'.",
-            "Must start every sentence with 'As an innocent ghost...'",
-            "Must perform a 5-second slow-motion death scene now.",
-            "Must speak in a robotic voice for 2 minutes."
+            "Must start every sentence with 'As a spectral ghost...'",
+            "Must perform a 5-second slow-motion death scene right now.",
+            "Must speak in a robotic monotone voice for the next 2 minutes."
         ];
 
-        // --- SVG ICONS ---
+        // Custom SVG icons
         const SVG_ICONS = {
             CIVILIAN: `<svg class="w-10 h-10 text-teal-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>`,
             MAFIA: `<svg class="w-10 h-10 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>`,
-            TIE: `<svg class="w-10 h-10 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`
+            TIE: `<svg class="w-10 h-10 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`
         };
 
-        // --- GAME STATE VARIABLES ---
-        let gameMode = 'local'; // 'local' or 'online'
+        // State variables
+        let gameMode = 'local';
         let playerNames = [];
-        let players = []; // { id, name, role: 'Mafia'|'Civilian', isAlive: true, seenRole: false }
+        let players = [];
         let currentVoterIndex = 0;
-        let votes = {}; // { voterId: targetId }
+        let votes = {};
         let forfeitEnabled = true;
 
-        // Multiplayer Online State
+        // Firebase multiplayer state
         let db = null;
         let auth = null;
         let roomCode = null;
-        let roomCodeGeneratedAt = 0; // Timestamp when code was created
+        let roomCodeGeneratedAt = 0;
         let isHost = false;
         let myPlayerId = null;
         let roomUnsubscribe = null;
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'mafia-party-app';
-
-        // Initialize Theme Mode
-        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-            document.documentElement.classList.add('dark');
-            updateThemeIcons(true);
-        }
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'mafia-party-edition-v2';
 
         function toggleTheme() {
             const isDark = document.documentElement.classList.toggle('dark');
-            updateThemeIcons(isDark);
-        }
-
-        function updateThemeIcons(isDark) {
             document.getElementById('sunIcon').classList.toggle('hidden', !isDark);
             document.getElementById('moonIcon').classList.toggle('hidden', isDark);
         }
 
-        // --- MODE SELECTION ---
         function selectGameMode(mode) {
             gameMode = mode;
             if (mode === 'local') {
@@ -490,7 +514,6 @@
             document.getElementById('joinCodeBox').classList.remove('hidden');
         }
 
-        // --- FIREBASE MULTIPLAYER LOGIC ---
         async function initFirebase() {
             if (db) return;
             try {
@@ -509,17 +532,15 @@
                     await signInAnonymously(auth);
                 }
             } catch (err) {
-                console.warn("Firebase initialized in local/offline fallback mode:", err);
+                console.warn("Firebase initialized in local offline mode:", err);
             }
         }
 
         function getOrGenerateRoomCode() {
             const now = Date.now();
-            // Re-use current room code if created within the last 60 seconds (60,000 ms)
             if (roomCode && (now - roomCodeGeneratedAt < 60000)) {
                 return roomCode;
             }
-
             const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
             let code = '';
             for (let i = 0; i < 4; i++) code += chars.charAt(Math.floor(Math.random() * chars.length));
@@ -561,12 +582,12 @@
 
                     listenToOnlineRoom();
                 } catch (e) {
-                    console.error("Error creating room document:", e);
+                    console.error("Error creating room:", e);
                 }
             }
 
-            document.getElementById('setupTitle').textContent = `Lobby (Room: ${roomCode})`;
-            document.getElementById('setupSubtitle').textContent = 'Share code with friends. Minimum 5 players.';
+            document.getElementById('setupTitle').textContent = `Lobby (Code: ${roomCode})`;
+            document.getElementById('setupSubtitle').textContent = 'Share code with friends. Minimum 5 players required.';
             document.getElementById('localPlayerInputBox').classList.add('hidden');
             switchScreen('setupScreen');
             renderSetupPlayerList();
@@ -586,7 +607,7 @@
             roomCode = code;
 
             if (!db) {
-                alert('Online database connection unavailable right now. Try Pass-the-Phone mode!');
+                alert('Online database connection unavailable.');
                 return;
             }
 
@@ -596,7 +617,7 @@
                 const snap = await getDoc(roomRef);
 
                 if (!snap.exists()) {
-                    alert('Room not found! Check the 4-letter code.');
+                    alert('Room not found! Please check the code.');
                     return;
                 }
 
@@ -625,13 +646,13 @@
                 document.getElementById('roomBadge').classList.remove('hidden');
 
                 listenToOnlineRoom();
-                document.getElementById('setupTitle').textContent = `Lobby (Room: ${roomCode})`;
+                document.getElementById('setupTitle').textContent = `Lobby (Code: ${roomCode})`;
                 document.getElementById('setupSubtitle').textContent = 'Waiting for host to start...';
                 document.getElementById('localPlayerInputBox').classList.add('hidden');
                 switchScreen('setupScreen');
             } catch (err) {
                 console.error("Join room error:", err);
-                alert('Could not join room. Please verify room code and internet connection.');
+                alert('Could not join room. Verify code and network connection.');
             }
         }
 
@@ -651,7 +672,7 @@
 
                 renderSetupPlayerList();
                 syncOnlineUI(roomData);
-            }, (err) => console.error("Room listener error:", err));
+            }, (err) => console.error("Listener error:", err));
         }
 
         function syncOnlineUI(roomData) {
@@ -661,8 +682,8 @@
                 if (document.getElementById('roleDistributionScreen').classList.contains('hidden')) {
                     switchScreen('roleDistributionScreen');
                 }
-                document.getElementById('roleScreenTitle').textContent = `Your Role (Player: ${players[myPlayerId]?.name || ''})`;
-                document.getElementById('roleScreenSubtitle').textContent = 'Tap to view your confidential role privately.';
+                document.getElementById('roleScreenTitle').textContent = `Your Role (${players[myPlayerId]?.name || ''})`;
+                document.getElementById('roleScreenSubtitle').textContent = 'Tap below to reveal your confidential role.';
                 renderRoleDistributionGrid();
             } else if (roomData.status === 'discussion') {
                 if (document.getElementById('discussionScreen').classList.contains('hidden')) {
@@ -693,7 +714,6 @@
             }
         }
 
-        // --- SETUP SCREEN LOGIC ---
         function handleAddPlayer(e) {
             e.preventDefault();
             const input = document.getElementById('playerNameInput');
@@ -736,11 +756,11 @@
 
             playerNames.forEach((name, idx) => {
                 const item = document.createElement('div');
-                item.className = 'flex justify-between items-center bg-slate-100 dark:bg-navy-800 px-3 py-2.5 rounded-xl font-bold text-sm text-slate-800 dark:text-white';
+                item.className = 'flex justify-between items-center bg-white/5 border border-white/10 px-3.5 py-2.5 rounded-2xl font-bold text-sm text-white';
                 item.innerHTML = `
-                    <span>${escapeHTML(name)} ${gameMode === 'online' && idx === myPlayerId ? '<span class="text-xs text-teal-500">(You)</span>' : ''}</span>
+                    <span>${escapeHTML(name)} ${gameMode === 'online' && idx === myPlayerId ? '<span class="text-xs text-teal-400 font-normal">(You)</span>' : ''}</span>
                     ${gameMode === 'local' ? `
-                    <button onclick="removePlayer(${idx})" class="text-slate-400 hover:text-rose-500 p-1 transition-colors">
+                    <button onclick="removePlayer(${idx})" class="text-slate-500 hover:text-rose-400 p-1 transition-colors">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                     </button>` : ''}
                 `;
@@ -767,7 +787,6 @@
             );
         }
 
-        // --- HELPER LOGIC: INITIAL ROLE ASSIGNMENT ---
         function assignShuffledRoles(playerList) {
             const count = playerList.length;
             const mafiaNum = Math.ceil(count / 3);
@@ -783,7 +802,6 @@
             }));
         }
 
-        // --- START GAME & ROLE ASSIGNMENT ---
         async function startGame() {
             forfeitEnabled = document.getElementById('forfeitsCheckbox').checked;
 
@@ -818,14 +836,14 @@
                     btn.onclick = () => showRoleModal(p.id);
                     btn.className = `p-4 rounded-2xl font-extrabold text-sm flex flex-col items-center justify-center gap-2 border transition-all ${
                         p.seenRole
-                            ? 'bg-slate-200 dark:bg-navy-900 border-slate-300 dark:border-slate-800 text-slate-400 dark:text-slate-600'
-                            : 'bg-white dark:bg-navy-800 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-white hover:border-teal-500 shadow-md active:scale-95'
+                            ? 'bg-white/5 border-white/5 text-slate-500'
+                            : 'glass-card border-white/10 text-white hover:border-teal-500/50 shadow-lg active:scale-95'
                     }`;
 
                     btn.innerHTML = `
-                        <span class="truncate w-full text-center">${escapeHTML(p.name)}</span>
-                        <span class="text-xs px-2.5 py-0.5 rounded-full font-bold ${
-                            p.seenRole ? 'bg-slate-300/50 text-slate-500' : 'bg-teal-500/10 text-teal-500'
+                        <span class="truncate w-full text-center font-black">${escapeHTML(p.name)}</span>
+                        <span class="text-[10px] px-2.5 py-0.5 rounded-full font-bold ${
+                            p.seenRole ? 'bg-white/5 text-slate-500' : 'bg-teal-500/10 text-teal-400 border border-teal-500/20'
                         }">
                             ${p.seenRole ? 'Seen ✓' : 'Tap to View'}
                         </span>
@@ -839,10 +857,10 @@
 
                 const btn = document.createElement('button');
                 btn.onclick = () => showRoleModal(myPlayer.id);
-                btn.className = 'col-span-2 p-6 rounded-3xl font-extrabold text-base flex flex-col items-center justify-center gap-2 border bg-white dark:bg-navy-800 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-white hover:border-teal-500 shadow-xl active:scale-95';
+                btn.className = 'col-span-2 glass-card p-6 rounded-3xl font-extrabold text-base flex flex-col items-center justify-center gap-2 border border-white/10 text-white hover:border-teal-500/50 shadow-2xl active:scale-95';
                 btn.innerHTML = `
-                    <span>View Secret Role for ${escapeHTML(myPlayer.name)}</span>
-                    <span class="text-xs px-3 py-1 rounded-full font-bold bg-teal-500/10 text-teal-500">Tap to Reveal Privately</span>
+                    <span class="font-black text-lg">View Secret Role for ${escapeHTML(myPlayer.name)}</span>
+                    <span class="text-xs px-3 py-1 rounded-full font-bold bg-teal-500/10 text-teal-400 border border-teal-500/20">Tap to Reveal Privately</span>
                 `;
                 grid.appendChild(btn);
 
@@ -863,7 +881,7 @@
             const teammatesBox = document.getElementById('mafiaTeammatesBox');
 
             if (p.role === 'Mafia') {
-                graphicBox.className = 'py-8 px-4 rounded-2xl flex flex-col items-center justify-center gap-3 bg-rose-500/10 border border-rose-500/30 text-rose-500';
+                graphicBox.className = 'py-6 px-4 rounded-2xl flex flex-col items-center justify-center gap-3 bg-rose-500/10 border border-rose-500/30 text-rose-400';
                 iconBox.innerHTML = SVG_ICONS.MAFIA;
                 title.textContent = 'MAFIA';
 
@@ -875,7 +893,7 @@
                     teammatesBox.classList.add('hidden');
                 }
             } else {
-                graphicBox.className = 'py-8 px-4 rounded-2xl flex flex-col items-center justify-center gap-3 bg-teal-500/10 border border-teal-500/30 text-teal-500';
+                graphicBox.className = 'py-6 px-4 rounded-2xl flex flex-col items-center justify-center gap-3 bg-teal-500/10 border border-teal-500/30 text-teal-400';
                 iconBox.innerHTML = SVG_ICONS.CIVILIAN;
                 title.textContent = 'CIVILIAN';
                 teammatesBox.classList.add('hidden');
@@ -890,7 +908,6 @@
             renderRoleDistributionGrid();
         }
 
-        // --- DISCUSSION PHASE LOGIC ---
         async function startDiscussionPhase() {
             const randomPrompt = PROMPT_TEMPLATES[Math.floor(Math.random() * PROMPT_TEMPLATES.length)];
 
@@ -932,13 +949,12 @@
 
             players.filter(p => p.isAlive).forEach(p => {
                 const badge = document.createElement('span');
-                badge.className = 'px-3 py-1.5 rounded-xl bg-white dark:bg-navy-900 border border-slate-200 dark:border-slate-800 text-slate-800 dark:text-white font-bold text-xs shadow-sm';
+                badge.className = 'px-3 py-1.5 rounded-xl glass-card text-white font-bold text-xs shadow-sm border border-white/10';
                 badge.textContent = p.name;
                 container.appendChild(badge);
             });
         }
 
-        // --- VOTING PHASE LOGIC ---
         async function startVotingPhase() {
             votes = {};
             if (gameMode === 'local') {
@@ -972,7 +988,7 @@
             if (!myPlayer || !myPlayer.isAlive) {
                 document.getElementById('votingBallotState').classList.add('hidden');
                 document.getElementById('onlineWaitingVotesBanner').classList.remove('hidden');
-                document.getElementById('voteProgressText').textContent = 'You are eliminated. Waiting for live votes...';
+                document.getElementById('voteProgressText').textContent = 'You are eliminated. Spectating votes...';
                 return;
             }
 
@@ -1016,10 +1032,10 @@
                 if (candidate.id === voterId) return;
 
                 const label = document.createElement('label');
-                label.className = 'flex items-center justify-between p-3.5 rounded-2xl bg-slate-100 dark:bg-navy-800 border border-transparent hover:border-rose-500 cursor-pointer font-bold text-sm text-slate-800 dark:text-white transition-all';
+                label.className = 'flex items-center justify-between p-3.5 rounded-2xl bg-white/5 border border-white/10 hover:border-rose-500/50 cursor-pointer font-bold text-sm text-white transition-all';
                 label.innerHTML = `
                     <span>${escapeHTML(candidate.name)}</span>
-                    <input type="radio" name="ballotVote" value="${candidate.id}" onchange="document.getElementById('submitVoteBtn').disabled = false" class="w-5 h-5 text-rose-500 focus:ring-rose-500 dark:bg-navy-900 border-slate-300">
+                    <input type="radio" name="ballotVote" value="${candidate.id}" onchange="document.getElementById('submitVoteBtn').disabled = false" class="w-5 h-5 text-rose-500 focus:ring-rose-500 bg-white/5 border-white/20">
                 `;
                 optionsContainer.appendChild(label);
             });
@@ -1064,7 +1080,6 @@
             }
         }
 
-        // --- ROUND RESULTS & ELIMINATION LOGIC ---
         function processVotesTally(votesMap) {
             const tally = {};
             Object.values(votesMap).forEach(targetId => {
@@ -1125,23 +1140,23 @@
             const forfeitContainer = document.getElementById('forfeitContainer');
 
             if (result.isTie || !result.eliminatedPlayer) {
-                verdictBadge.className = 'w-16 h-16 mx-auto rounded-2xl flex items-center justify-center bg-amber-500/10';
+                verdictBadge.className = 'w-16 h-16 mx-auto rounded-2xl flex items-center justify-center bg-amber-500/10 border border-amber-500/20';
                 verdictBadge.innerHTML = SVG_ICONS.TIE;
                 verdictTitle.textContent = "It's a Tie!";
-                verdictSubtitle.textContent = "Nobody was voted out this round.";
+                verdictSubtitle.textContent = "Nobody received a decisive majority.";
                 forfeitContainer.classList.add('hidden');
             } else {
                 const ep = result.eliminatedPlayer;
                 if (ep.role === 'Mafia') {
-                    verdictBadge.className = 'w-16 h-16 mx-auto rounded-2xl flex items-center justify-center bg-rose-500/10';
+                    verdictBadge.className = 'w-16 h-16 mx-auto rounded-2xl flex items-center justify-center bg-rose-500/10 border border-rose-500/20';
                     verdictBadge.innerHTML = SVG_ICONS.MAFIA;
                 } else {
-                    verdictBadge.className = 'w-16 h-16 mx-auto rounded-2xl flex items-center justify-center bg-teal-500/10';
+                    verdictBadge.className = 'w-16 h-16 mx-auto rounded-2xl flex items-center justify-center bg-teal-500/10 border border-teal-500/20';
                     verdictBadge.innerHTML = SVG_ICONS.CIVILIAN;
                 }
 
                 verdictTitle.textContent = `${ep.name} was Voted Out!`;
-                verdictSubtitle.innerHTML = `Role Revealed: <strong class="${ep.role === 'Mafia' ? 'text-rose-500' : 'text-teal-500'} uppercase">${ep.role}</strong>`;
+                verdictSubtitle.innerHTML = `Role Revealed: <strong class="${ep.role === 'Mafia' ? 'text-rose-400' : 'text-teal-400'} uppercase">${ep.role}</strong>`;
 
                 if (result.forfeitText) {
                     document.getElementById('forfeitText').textContent = `"${result.forfeitText}"`;
@@ -1160,11 +1175,11 @@
 
                 if (voter && target) {
                     const item = document.createElement('div');
-                    item.className = 'flex justify-between items-center py-1 border-b border-slate-100 dark:border-slate-800 text-slate-700 dark:text-slate-300';
+                    item.className = 'flex justify-between items-center py-1.5 border-b border-white/5 text-slate-300';
                     item.innerHTML = `
                         <span>${escapeHTML(voter.name)}</span>
-                        <span class="text-slate-400 font-normal">voted for</span>
-                        <span class="font-bold text-rose-500">${escapeHTML(target.name)}</span>
+                        <span class="text-slate-500 text-[11px]">voted for</span>
+                        <span class="font-bold text-rose-400">${escapeHTML(target.name)}</span>
                     `;
                     breakdownContainer.appendChild(item);
                 }
@@ -1189,29 +1204,27 @@
                     await updateDoc(roomRef, { status: 'gameover', winner: winner });
                 }
             } else {
-                // Continue to next discussion phase while maintaining current roles
                 startDiscussionPhase();
             }
         }
 
-        // --- GAME OVER SCREEN ---
         function showGameOverUI(winner) {
             const iconBox = document.getElementById('victoryIcon');
             const title = document.getElementById('victoryTitle');
             const subtitle = document.getElementById('victorySubtitle');
 
             if (winner === 'CIVILIANS') {
-                iconBox.className = 'w-20 h-20 mx-auto rounded-3xl flex items-center justify-center bg-teal-500/10';
+                iconBox.className = 'w-20 h-20 mx-auto rounded-3xl flex items-center justify-center bg-teal-500/10 border border-teal-500/20';
                 iconBox.innerHTML = SVG_ICONS.CIVILIAN;
                 title.textContent = 'CIVILIANS WIN!';
-                title.className = 'text-3xl font-black text-teal-500';
-                subtitle.textContent = 'All Mafia members were discovered and eliminated!';
+                title.className = 'text-3xl font-black text-teal-400';
+                subtitle.textContent = 'All Mafia members were eliminated!';
             } else {
-                iconBox.className = 'w-20 h-20 mx-auto rounded-3xl flex items-center justify-center bg-rose-500/10';
+                iconBox.className = 'w-20 h-20 mx-auto rounded-3xl flex items-center justify-center bg-rose-500/10 border border-rose-500/20';
                 iconBox.innerHTML = SVG_ICONS.MAFIA;
                 title.textContent = 'MAFIA WINS!';
                 title.className = 'text-3xl font-black text-rose-500';
-                subtitle.textContent = 'The Mafia equals or outnumbers the Civilians!';
+                subtitle.textContent = 'The Mafia gained overwhelming control!';
             }
 
             const rosterContainer = document.getElementById('finalRosterList');
@@ -1219,13 +1232,13 @@
 
             players.forEach(p => {
                 const item = document.createElement('div');
-                item.className = 'flex justify-between items-center p-3 rounded-xl bg-slate-100 dark:bg-navy-800 font-bold text-sm';
+                item.className = 'flex justify-between items-center p-3 rounded-2xl bg-white/5 border border-white/5 font-bold text-sm';
                 item.innerHTML = `
                     <div class="flex items-center gap-2">
-                        <span class="text-slate-800 dark:text-white">${escapeHTML(p.name)}</span>
-                        ${!p.isAlive ? '<span class="text-xs font-semibold text-slate-400">(Eliminated)</span>' : ''}
+                        <span class="text-white">${escapeHTML(p.name)}</span>
+                        ${!p.isAlive ? '<span class="text-[10px] font-semibold text-slate-500">(Eliminated)</span>' : ''}
                     </div>
-                    <span class="text-xs uppercase tracking-wider ${p.role === 'Mafia' ? 'text-rose-500' : 'text-teal-500'}">
+                    <span class="text-xs font-black uppercase tracking-wider ${p.role === 'Mafia' ? 'text-rose-400' : 'text-teal-400'}">
                         ${p.role}
                     </span>
                 `;
@@ -1258,7 +1271,6 @@
             switchScreen('modeSelectScreen');
         }
 
-        // --- HELPER FUNCTION: SCREEN SWITCHER ---
         function switchScreen(screenId) {
             const screens = ['modeSelectScreen', 'onlineLobbyChoiceScreen', 'setupScreen', 'roleDistributionScreen', 'discussionScreen', 'votingScreen', 'roundResultScreen', 'gameOverScreen'];
             screens.forEach(id => {
