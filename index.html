@@ -535,7 +535,6 @@
             document.getElementById('roomCodeDisplay').textContent = roomCode;
             document.getElementById('roomBadge').classList.remove('hidden');
 
-            // Attempt cloud sync if DB available
             if (db) {
                 try {
                     const { doc, setDoc } = window.firebaseImports;
@@ -552,7 +551,7 @@
 
                     listenToOnlineRoom();
                 } catch (e) {
-                    console.log("Created offline lobby fallback");
+                    console.log("Created lobby in room mode");
                 }
             }
 
@@ -624,99 +623,6 @@
             }
         }
 
-        function generateRoomCode() {
-            const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
-            let code = '';
-            for (let i = 0; i < 4; i++) code += chars.charAt(Math.floor(Math.random() * chars.length));
-            return code;
-        }
-
-        async function createOnlineRoom() {
-            const nameInput = document.getElementById('myPlayerNameInput').value.trim();
-            if (!nameInput) {
-                alert('Please enter your name.');
-                return;
-            }
-
-            isHost = true;
-            roomCode = generateRoomCode();
-            myPlayerId = 0;
-            playerNames = [nameInput];
-
-            document.getElementById('roomCodeDisplay').textContent = roomCode;
-            document.getElementById('roomBadge').classList.remove('hidden');
-
-            const { doc, setDoc } = window.firebaseImports;
-            const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomCode);
-
-            await setDoc(roomRef, {
-                status: 'setup',
-                hostId: auth.currentUser?.uid || 'host',
-                forfeitEnabled: true,
-                players: [{ id: 0, name: nameInput, role: '', isAlive: true, seenRole: false }],
-                currentPrompt: '',
-                votes: {}
-            });
-
-            listenToOnlineRoom();
-            document.getElementById('setupTitle').textContent = `Lobby (Room: ${roomCode})`;
-            document.getElementById('setupSubtitle').textContent = 'Share code with friends. Minimum 5 players.';
-            document.getElementById('localPlayerInputBox').classList.add('hidden');
-            switchScreen('setupScreen');
-        }
-
-        async function joinOnlineRoom() {
-            const nameInput = document.getElementById('myPlayerNameInput').value.trim();
-            const code = document.getElementById('roomCodeInput').value.trim().toUpperCase();
-
-            if (!nameInput || code.length !== 4) {
-                alert('Please enter your name and a valid 4-letter room code.');
-                return;
-            }
-
-            isHost = false;
-            roomCode = code;
-
-            const { doc, getDoc, updateDoc } = window.firebaseImports;
-            const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomCode);
-            const snap = await getDoc(roomRef);
-
-            if (!snap.exists()) {
-                alert('Room not found! Check the 4-letter code.');
-                return;
-            }
-
-            const data = snap.data();
-            if (data.status !== 'setup') {
-                alert('Game has already started in this room!');
-                return;
-            }
-
-            if (data.players.length >= 12) {
-                alert('Room is full (max 12 players).');
-                return;
-            }
-
-            if (data.players.some(p => p.name.toLowerCase() === nameInput.toLowerCase())) {
-                alert('Name already taken in this room.');
-                return;
-            }
-
-            myPlayerId = data.players.length;
-            const updatedPlayers = [...data.players, { id: myPlayerId, name: nameInput, role: '', isAlive: true, seenRole: false }];
-
-            await updateDoc(roomRef, { players: updatedPlayers });
-
-            document.getElementById('roomCodeDisplay').textContent = roomCode;
-            document.getElementById('roomBadge').classList.remove('hidden');
-
-            listenToOnlineRoom();
-            document.getElementById('setupTitle').textContent = `Lobby (Room: ${roomCode})`;
-            document.getElementById('setupSubtitle').textContent = 'Waiting for host to start...';
-            document.getElementById('localPlayerInputBox').classList.add('hidden');
-            switchScreen('setupScreen');
-        }
-
         function listenToOnlineRoom() {
             if (roomUnsubscribe) roomUnsubscribe();
             const { doc, onSnapshot } = window.firebaseImports;
@@ -739,7 +645,6 @@
         function syncOnlineUI(roomData) {
             if (gameMode !== 'online') return;
 
-            // Sync screens based on room status
             if (roomData.status === 'roles') {
                 if (document.getElementById('roleDistributionScreen').classList.contains('hidden')) {
                     switchScreen('roleDistributionScreen');
@@ -755,7 +660,6 @@
                 updateDiscussionHeader();
                 renderAlivePlayersBadges();
 
-                // Non-hosts can't change prompts or trigger votes
                 document.getElementById('newPromptBtn').style.display = isHost ? 'inline-flex' : 'none';
                 document.getElementById('startVotingBtn').style.display = isHost ? 'block' : 'none';
             } else if (roomData.status === 'voting') {
@@ -861,7 +765,7 @@
 
             return playerList.map((p, i) => ({
                 ...p,
-                role: p.isAlive ? roles[i] : 'Civilian', // Eliminated players keep civilian placeholder
+                role: p.isAlive ? roles[i] : 'Civilian',
                 seenRole: false
             }));
         }
@@ -917,7 +821,6 @@
                 });
                 document.getElementById('startDiscussionBtn').disabled = !allSeen;
             } else {
-                // Online: each player sees only their card
                 const myPlayer = players[myPlayerId];
                 if (!myPlayer) return;
 
@@ -1135,7 +1038,6 @@
                 const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomCode);
 
                 if (isHost && Object.keys(newVotes).length >= aliveCount) {
-                    // Calculate and publish results directly if all voted
                     const roundResult = processVotesTally(newVotes);
                     await updateDoc(roomRef, {
                         status: 'result',
@@ -1236,7 +1138,6 @@
                 }
             }
 
-            // Render Vote Breakdown
             const breakdownContainer = document.getElementById('voteBreakdownList');
             breakdownContainer.innerHTML = '';
 
@@ -1275,7 +1176,6 @@
                     await updateDoc(roomRef, { status: 'gameover', winner: winner });
                 }
             } else {
-                // Reshuffle roles for the next round!
                 players = assignShuffledRoles(players);
 
                 if (gameMode === 'local') {
@@ -1332,7 +1232,6 @@
         }
 
         async function resetGameSamePlayers() {
-            // Reset survival status for all players
             players = players.map(p => ({ ...p, isAlive: true }));
 
             if (gameMode === 'local') {
