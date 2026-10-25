@@ -448,6 +448,7 @@
         let db = null;
         let auth = null;
         let roomCode = null;
+        let roomCodeGeneratedAt = 0; // Timestamp when code was created
         let isHost = false;
         let myPlayerId = null;
         let roomUnsubscribe = null;
@@ -512,10 +513,18 @@
             }
         }
 
-        function generateRoomCode() {
+        function getOrGenerateRoomCode() {
+            const now = Date.now();
+            // Re-use current room code if created within the last 60 seconds (60,000 ms)
+            if (roomCode && (now - roomCodeGeneratedAt < 60000)) {
+                return roomCode;
+            }
+
             const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
             let code = '';
             for (let i = 0; i < 4; i++) code += chars.charAt(Math.floor(Math.random() * chars.length));
+            roomCode = code;
+            roomCodeGeneratedAt = now;
             return code;
         }
 
@@ -528,7 +537,7 @@
 
             await initFirebase();
             isHost = true;
-            roomCode = generateRoomCode();
+            roomCode = getOrGenerateRoomCode();
             myPlayerId = 0;
             playerNames = [nameInput];
             players = [{ id: 0, name: nameInput, role: '', isAlive: true, seenRole: false }];
@@ -1244,6 +1253,7 @@
         function resetGameNewPlayers() {
             if (roomUnsubscribe) roomUnsubscribe();
             roomCode = null;
+            roomCodeGeneratedAt = 0;
             document.getElementById('roomBadge').classList.add('hidden');
             switchScreen('modeSelectScreen');
         }
