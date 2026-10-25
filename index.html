@@ -81,6 +81,10 @@
         .avatar-gradient-4 { background: linear-gradient(135deg, #f8fafc, #cbd5e1); }
         .avatar-gradient-5 { background: linear-gradient(135deg, #60a5fa, #2563eb); }
     </style>
+
+    <!-- PeerJS for Free Multi-Device Networking -->
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+
     <!-- Firebase Module Setup -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
@@ -484,7 +488,7 @@
         let votes = {};
         let forfeitEnabled = true;
 
-        // Sync & Channel Engine
+        // Sync & Channel Engine (PeerJS + Firebase + Local Fallbacks)
         let db = null;
         let auth = null;
         let roomCode = null;
@@ -492,35 +496,84 @@
         let myPlayerId = null;
         let roomUnsubscribe = null;
         let networkChannel = null;
+        let peer = null;
+        let peerConnections = {};
+        let hostConn = null;
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'mafia-imposter-v1';
+
+        // PeerJS Setup for Cross-Device Support
+        function initPeerJS(code) {
+            cleanPeer();
+            const peerId = isHost ? `mafia-room-${code}` : `mafia-player-${code}-${Math.random().toString(36).substring(2, 7)}`;
+            
+            peer = new Peer(peerId, { debug: 1 });
+
+            peer.on('open', () => {
+                if (!isHost) {
+                    const hConn = peer.connect(`mafia-room-${code}`);
+                    setupClientConnection(hConn);
+                }
+            });
+
+            peer.on('connection', (conn) => {
+                if (isHost) {
+                    peerConnections[conn.peer] = conn;
+                    conn.on('data', (data) => handlePeerMessage(data, conn));
+                    conn.on('close', () => delete peerConnections[conn.peer]);
+                }
+            });
+
+            peer.on('error', (err) => {
+                console.warn("PeerJS connection note:", err.type);
+            });
+        }
+
+        function cleanPeer() {
+            if (peer) {
+                peer.destroy();
+                peer = null;
+            }
+            peerConnections = {};
+            hostConn = null;
+        }
+
+        function setupClientConnection(conn) {
+            hostConn = conn;
+            conn.on('open', () => {
+                const myName = document.getElementById('myPlayerNameInput').value.trim();
+                conn.send({ type: 'JOIN_REQUEST', name: myName });
+            });
+            conn.on('data', (data) => handlePeerMessage(data, conn));
+        }
+
+        function handlePeerMessage(data, conn) {
+            if (data.type === 'JOIN_REQUEST' && isHost) {
+                if (players.some(p => p.name.toLowerCase() === data.name.toLowerCase())) return;
+                const newId = players.length;
+                players.push({ id: newId, name: data.name, role: '', isAlive: true, seenRole: false });
+                playerNames = players.map(p => p.name);
+                broadcastState();
+            } else if (data.type === 'STATE_UPDATE') {
+                applyRoomState(data.state);
+            } else if (data.type === 'SUBMIT_VOTE' && isHost) {
+                votes[data.voterId] = data.targetId;
+                const aliveCount = players.filter(p => p.isAlive).length;
+                if (Object.keys(votes).length >= aliveCount) {
+                    const roundResult = processVotesTally(votes);
+                    players = roundResult.updatedPlayers;
+                    broadcastState('result', { roundResult });
+                } else {
+                    broadcastState('voting');
+                }
+            }
+        }
 
         // Local cross-tab BroadcastChannel for testing/same-domain multi-device
         function initBroadcastChannel(code) {
             if (networkChannel) networkChannel.close();
             try {
                 networkChannel = new BroadcastChannel(`mafia_room_${code}`);
-                networkChannel.onmessage = (e) => {
-                    const data = e.data;
-                    if (data.type === 'JOIN_REQUEST' && isHost) {
-                        const newId = players.length;
-                        if (players.some(p => p.name.toLowerCase() === data.name.toLowerCase())) return;
-                        players.push({ id: newId, name: data.name, role: '', isAlive: true, seenRole: false });
-                        playerNames = players.map(p => p.name);
-                        broadcastState();
-                    } else if (data.type === 'STATE_UPDATE') {
-                        applyRoomState(data.state);
-                    } else if (data.type === 'SUBMIT_VOTE' && isHost) {
-                        votes[data.voterId] = data.targetId;
-                        const aliveCount = players.filter(p => p.isAlive).length;
-                        if (Object.keys(votes).length >= aliveCount) {
-                            const roundResult = processVotesTally(votes);
-                            players = roundResult.updatedPlayers;
-                            broadcastState('result', { roundResult });
-                        } else {
-                            broadcastState('voting');
-                        }
-                    }
-                };
+                networkChannel.onmessage = (e) => handlePeerMessage(e.data, null);
             } catch(err) {}
         }
 
@@ -536,10 +589,19 @@
                 ...extraProps
             };
 
+            // 1. Broadcast over PeerJS WebRTC connections
+            Object.values(peerConnections).forEach(conn => {
+                if (conn && conn.open) {
+                    conn.send({ type: 'STATE_UPDATE', state });
+                }
+            });
+
+            // 2. Broadcast over local browser channel
             if (networkChannel) {
                 networkChannel.postMessage({ type: 'STATE_UPDATE', state });
             }
 
+            // 3. Sync to cloud database if available
             if (db && roomCode) {
                 try {
                     const { doc, setDoc } = window.firebaseImports;
@@ -558,7 +620,6 @@
             window.currentRoomStatus = roomData.status;
 
             if (myPlayerId !== null && players[myPlayerId]) {
-                // Keep ID synchronized by name matching if needed
                 const match = players.find(p => p.name.toLowerCase() === players[myPlayerId].name.toLowerCase());
                 if (match) myPlayerId = match.id;
             }
@@ -571,6 +632,7 @@
             sfx.click();
             gameMode = mode;
             if (mode === 'local') {
+                cleanPeer();
                 document.getElementById('roomBadge').classList.add('hidden');
                 document.getElementById('localPlayerInputBox').classList.remove('hidden');
                 document.getElementById('setupTitle').textContent = 'Player Roster';
@@ -631,6 +693,7 @@
             document.getElementById('roomBadge').classList.remove('hidden');
 
             initBroadcastChannel(roomCode);
+            initPeerJS(roomCode);
             listenToOnlineRoom();
             broadcastState('setup');
 
@@ -656,12 +719,13 @@
             roomCode = code;
 
             initBroadcastChannel(roomCode);
+            initPeerJS(roomCode);
             document.getElementById('roomCodeDisplay').textContent = roomCode;
             document.getElementById('roomBadge').classList.remove('hidden');
 
             listenToOnlineRoom();
 
-            // Broadcast join request to existing room channel
+            // Broadcast join request to existing room channel fallback
             if (networkChannel) {
                 networkChannel.postMessage({ type: 'JOIN_REQUEST', name: nameInput });
             }
@@ -1072,6 +1136,11 @@
                 }
             } else if (gameMode === 'online') {
                 votes[myPlayerId] = targetId;
+                
+                if (hostConn && hostConn.open) {
+                    hostConn.send({ type: 'SUBMIT_VOTE', voterId: myPlayerId, targetId: targetId });
+                }
+
                 if (networkChannel) {
                     networkChannel.postMessage({ type: 'SUBMIT_VOTE', voterId: myPlayerId, targetId: targetId });
                 }
@@ -1272,6 +1341,7 @@
 
         function resetGameNewPlayers() {
             sfx.click();
+            cleanPeer();
             if (roomUnsubscribe) roomUnsubscribe();
             if (networkChannel) networkChannel.close();
             roomCode = null;
