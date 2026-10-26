@@ -158,13 +158,16 @@
       currentVoterIdx: 0,
       votes: {},
       discussionTimeLeft: 300,
+      voteTimeLeft: 120,
       timerInterval: null,
+      voteTimerInterval: null,
       murdererTargetId: null,
       lastEliminatedPlayer: null,
       lastEliminatedForfeit: '',
       winner: null,
       currentPrompt: '',
-      roundCount: 1
+      roundCount: 1,
+      tiebreakerActive: false
     };
 
     const gameForfeits = [
@@ -259,11 +262,15 @@
           G.players.push(data.player);
         }
         broadcastState();
+      } else if (data.type === 'SELECT_NIGHT_TARGET' && G.isHost) {
+        G.murdererTargetId = data.targetId;
+        broadcastState();
       } else if (data.type === 'CAST_VOTE') {
         if (G.isHost) {
           G.votes[data.voterId] = data.targetId;
           const livingPlayers = G.players.filter(p => p.alive);
           if (Object.keys(G.votes).length >= livingPlayers.length) {
+            if (G.voteTimerInterval) clearInterval(G.voteTimerInterval);
             tallyVotesAndEliminate();
           } else {
             broadcastState();
@@ -295,7 +302,6 @@
         if (total >= 7 && total <= 10) badCount = 2;
         else if (total > 10) badCount = 3;
       } else {
-        // Prevent setting bad count equal to half or more than half of starting players
         badCount = Math.min(parseInt(G.imposterCountMode, 10), Math.floor((total - 1) / 2));
         if (badCount < 1) badCount = 1;
       }
@@ -670,8 +676,8 @@
     }
 
     function renderReveal() {
-      // In online mode, always view YOUR OWN role card on your device
-      const myPlayer = G.players.find(p => p.id === G.myPlayerId) || G.players[G.currentRevealIdx];
+      // Strictly reference own player object on client devices in online mode
+      const myPlayer = G.players.find(p => p.id === G.myPlayerId) || G.players[0];
       const p = G.netMode === 'online' ? myPlayer : G.players[G.currentRevealIdx];
       const isMafiaMode = G.mode === 'mafia';
 
@@ -871,6 +877,150 @@
       }
     }
 
+    function goVoteBallot() {
+      G.phase = 'vote_ballot';
+      G.votes = {};
+      G.currentVoterIdx = 0;
+      G.voteTimeLeft = 120; // 2 minute voting timer
+      if (G.netMode === 'online') broadcastState();
+      else renderState();
+      startVoteTimer();
+    }
+
+    function startVoteTimer() {
+      if (G.voteTimerInterval) clearInterval(G.voteTimerInterval);
+      G.voteTimerInterval = setInterval(() => {
+        if (G.voteTimeLeft > 0) {
+          G.voteTimeLeft--;
+          renderVoteTimerDisplay();
+        } else {
+          clearInterval(G.voteTimerInterval);
+          if (G.isHost) tallyVotesAndEliminate();
+        }
+      }, 1000);
+    }
+
+    function renderVoteTimerDisplay() {
+      const el = document.getElementById('voteTimerMinutes');
+      if (!el) return;
+      const m = Math.floor(G.voteTimeLeft / 60);
+      const s = G.voteTimeLeft % 60;
+      el.textContent = `${m}:${s < 10 ? '0' : ''}${s}`;
+    }
+
+    function renderVoteBallot() {
+      const livingPlayers = G.players.filter(p => p.alive);
+
+      if (G.netMode === 'online') {
+        const myPlayer = G.players.find(p => p.id === G.myPlayerId);
+        const hasVoted = myPlayer && G.votes[myPlayer.id];
+
+        const m = Math.floor(G.voteTimeLeft / 60);
+        const s = G.voteTimeLeft % 60;
+
+        return `
+          <div class="flex flex-col items-center text-center space-y-6 w-full animate-fade-in">
+            <div class="relative w-20 h-20 rounded-full bg-slate-950 border-2 border-indigo-500/50 flex flex-col items-center justify-center glow-indigo">
+              <span id="voteTimerMinutes" class="text-xl font-black text-indigo-400 tracking-wider">${m}:${s < 10 ? '0' : ''}${s}</span>
+            </div>
+            <div>
+              <span class="text-xs font-bold text-slate-400 uppercase tracking-widest block">ROUND ${G.roundCount} BALLOT</span>
+              <h2 class="text-2xl font-black text-white mt-1">CAST YOUR SECRET VOTE</h2>
+              <p class="text-xs text-indigo-400 mt-1 font-semibold">
+                ${Object.keys(G.votes).length} of ${livingPlayers.length} votes submitted
+              </p>
+            </div>
+
+            ${!myPlayer || !myPlayer.alive ? `
+              <div class="w-full bg-red-950/40 border border-red-800/60 p-4 rounded-2xl text-red-300 text-xs font-bold">
+                👻 You are eliminated! Observing live vote count...
+              </div>
+            ` : hasVoted ? `
+              <div class="w-full bg-slate-950/80 border border-emerald-500/50 p-6 rounded-3xl flex flex-col items-center space-y-2">
+                <span class="text-2xl">✅</span>
+                <span class="text-sm font-extrabold text-emerald-400">VOTE SUBMITTED!</span>
+                <p class="text-xs text-slate-400 max-w-xs">Waiting for other players to submit their vote or timer to conclude...</p>
+              </div>
+            ` : `
+              <div class="w-full space-y-2 max-h-48 overflow-y-auto">
+                ${livingPlayers.map(target => `
+                  <button onclick="submitOnlineVote('${target.id}')" class="w-full p-3.5 bg-slate-900 hover:bg-slate-800 border border-slate-700 hover:border-indigo-500 text-slate-200 font-bold text-sm rounded-xl flex items-center justify-between transition-all cursor-pointer">
+                    <span>${target.name}</span>
+                    <span class="text-xs text-slate-400 font-semibold">Vote Out &rarr;</span>
+                  </button>
+                `).join('')}
+              </div>
+            `}
+
+            ${G.isHost ? `
+              <button onclick="skipVoteTimer()" class="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold text-xs rounded-xl transition-all shadow-md cursor-pointer">
+                Skip Timer & Force Tally &rarr;
+              </button>
+            ` : ''}
+          </div>
+        `;
+      }
+
+      // Pass the Phone Mode Voting
+      const currentVoter = livingPlayers[G.currentVoterIdx];
+      return `
+        <div class="flex flex-col items-center text-center space-y-6 w-full animate-fade-in">
+          <div>
+            <span class="text-xs font-bold text-slate-400 uppercase tracking-widest block">PASS PHONE VOTE</span>
+            <h2 class="text-2xl font-black text-white mt-1">${currentVoter ? currentVoter.name : 'Voter'}'s Turn</h2>
+            <p class="text-xs text-slate-400 mt-1">Cast your vote secretly without showing the group!</p>
+          </div>
+          <div class="w-full space-y-2 max-h-48 overflow-y-auto">
+            ${livingPlayers.map(target => `
+              <button onclick="submitPassVote('${target.id}')" class="w-full p-3.5 bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 font-bold text-sm rounded-xl flex items-center justify-between transition-all cursor-pointer">
+                <span>${target.name}</span>
+                <span class="text-xs text-slate-400 font-semibold">Vote &rarr;</span>
+              </button>
+            `).join('')}
+          </div>
+        </div>
+      `;
+    }
+
+    function submitOnlineVote(targetId) {
+      sfx.click();
+      G.votes[G.myPlayerId] = targetId;
+      if (!G.isHost) {
+        const hostConn = peerConns.find(c => c && c.open);
+        if (hostConn) hostConn.send({ type: 'CAST_VOTE', voterId: G.myPlayerId, targetId: targetId });
+      } else {
+        const livingPlayers = G.players.filter(p => p.alive);
+        if (Object.keys(G.votes).length >= livingPlayers.length) {
+          if (G.voteTimerInterval) clearInterval(G.voteTimerInterval);
+          tallyVotesAndEliminate();
+        } else {
+          broadcastState();
+        }
+      }
+      renderState();
+    }
+
+    function submitPassVote(targetId) {
+      sfx.click();
+      const livingPlayers = G.players.filter(p => p.alive);
+      const voter = livingPlayers[G.currentVoterIdx];
+      G.votes[voter.id] = targetId;
+
+      if (G.currentVoterIdx + 1 < livingPlayers.length) {
+        G.currentVoterIdx++;
+        renderState();
+      } else {
+        if (G.voteTimerInterval) clearInterval(G.voteTimerInterval);
+        tallyVotesAndEliminate();
+      }
+    }
+
+    function skipVoteTimer() {
+      sfx.click();
+      if (G.voteTimerInterval) clearInterval(G.voteTimerInterval);
+      tallyVotesAndEliminate();
+    }
+
     function goToNightApproaching() {
       G.phase = 'night_approaching';
       if (G.netMode === 'online') broadcastState();
@@ -969,6 +1119,19 @@
       }
     }
 
+    function concludeNightPhase() {
+      sfx.gong();
+      if (G.murdererTargetId) {
+        const victim = G.players.find(p => p.id === G.murdererTargetId);
+        if (victim) {
+          victim.alive = false;
+          G.lastEliminatedPlayer = victim;
+          G.lastEliminatedForfeit = getRandomForfeit();
+        }
+      }
+      goVoteBallot();
+    }
+
     function tallyVotesAndEliminate() {
       const counts = {};
       Object.values(G.votes).forEach(tId => {
@@ -999,18 +1162,15 @@
         }
       } else {
         G.lastEliminatedPlayer = null;
-        // Check for 1v1 stalemate during tie vote
         const livingPlayers = G.players.filter(p => p.alive);
         const badTeam = livingPlayers.filter(p => p.role === 'mafia' || p.role === 'murderer');
         const goodTeam = livingPlayers.filter(p => p.role !== 'mafia' && p.role !== 'murderer');
 
-        // Sudden death rule: If 1v1 tie or 2 consecutive ties, trigger coin toss / sudden death forfeit
         if (livingPlayers.length === 2 && badTeam.length === 1 && goodTeam.length === 1) {
           G.tiebreakerActive = true;
         }
       }
 
-      // ALWAYS transition to vote_results screen first
       G.phase = 'vote_results';
       if (G.netMode === 'online') broadcastState();
       else renderState();
@@ -1019,7 +1179,6 @@
     function resolveSuddenDeathCoinToss() {
       sfx.gong();
       const livingPlayers = G.players.filter(p => p.alive);
-      // Pick one randomly for sudden death elimination
       const loser = livingPlayers[Math.floor(Math.random() * livingPlayers.length)];
       loser.alive = false;
       G.lastEliminatedPlayer = loser;
@@ -1061,7 +1220,6 @@
             </div>
           `}
 
-          <!-- Display remaining alive counts for full clarity -->
           <div class="w-full bg-slate-950/40 border border-slate-800 rounded-xl p-3 flex justify-between text-xs font-bold text-slate-300">
             <span>Remaining Alive: ${livingPlayers.length}</span>
             <span>(${goodTeam.length} ${G.mode === 'mafia' ? 'Civilians' : 'Guests'}, ${badTeam.length} ${G.mode === 'mafia' ? 'Mafia' : 'Murderers'})</span>
@@ -1082,10 +1240,8 @@
 
     function advanceRoundOrEnd() {
       sfx.click();
-      // Check if win conditions are met
       if (checkWinConditions()) return;
 
-      // If game is not over, proceed to next round!
       G.roundCount++;
       if (G.mode === 'mafia') {
         startDiscussion();
@@ -1118,7 +1274,7 @@
         return true;
       }
 
-      // Bad team wins ONLY when 2 bad team (Mafia/Murderer) vs 1 good team (Civilian/Guest), or good team reaches 0
+      // Bad team wins ONLY when 2 bad team vs 1 good team, or good team reaches 0
       if (goodTeam.length === 0 || (badTeam.length === 2 && goodTeam.length === 1)) {
         G.winner = G.mode === 'mafia' ? 'MAFIA' : 'MURDERER';
         G.phase = 'game_over';
@@ -1127,7 +1283,6 @@
         return true;
       }
 
-      // Game continues!
       return false;
     }
 
