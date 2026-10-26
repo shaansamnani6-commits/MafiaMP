@@ -230,20 +230,17 @@
       if (!G.isHost) return;
       peerConns.forEach(conn => {
         if (conn && conn.open) {
-          // Send customized state per connection so private roles aren't leaked
           const connPlayerId = conn.peerPlayerId;
           const sanitizedState = JSON.parse(JSON.stringify(G));
           
-          if (G.phase === 'reveal') {
-            sanitizedState.players.forEach(p => {
-              if (p.id !== connPlayerId) {
-                // Keep partner roles visible if both are bad guys
-                const viewer = G.players.find(x => x.id === connPlayerId);
-                const isBothBad = viewer && (viewer.role === 'mafia' || viewer.role === 'murderer') && (p.role === 'mafia' || p.role === 'murderer');
-                if (!isBothBad) p.role = '???';
-              }
-            });
-          }
+          // Hide private roles from other players across all active phases
+          sanitizedState.players.forEach(p => {
+            if (p.id !== connPlayerId) {
+              const viewer = G.players.find(x => x.id === connPlayerId);
+              const isBothBad = viewer && (viewer.role === 'mafia' || viewer.role === 'murderer') && (p.role === 'mafia' || p.role === 'murderer');
+              if (!isBothBad) p.role = '???';
+            }
+          });
           conn.send({ type: 'STATE_UPDATE', state: sanitizedState });
         }
       });
@@ -907,15 +904,36 @@
     }
 
     function renderMurderersOpenEyes() {
-      const targets = G.players.filter(p => p.alive && p.role !== 'murderer');
+      const myPlayer = G.players.find(p => p.id === G.myPlayerId);
+      const isBadGuy = myPlayer && (myPlayer.role === 'murderer' || myPlayer.role === 'mafia');
+
+      // If user is innocent in online mode, show sleeping night screen
+      if (G.netMode === 'online' && !isBadGuy) {
+        return `
+          <div class="flex flex-col items-center text-center space-y-6 w-full animate-fade-in py-4">
+            <div class="w-20 h-20 rounded-full bg-slate-950 border-2 border-indigo-500/60 flex items-center justify-center text-indigo-400 shadow-xl">
+              <span class="text-3xl">🌙</span>
+            </div>
+            <div>
+              <h2 class="text-2xl font-black text-indigo-400 uppercase">NIGHT PHASE IN PROGRESS</h2>
+              <p class="text-xs text-slate-300 mt-2 max-w-xs mx-auto">Keep your eyes closed! The murderer/mafia is choosing a target on their device...</p>
+            </div>
+            <div class="w-full bg-slate-950/60 border border-slate-800/80 p-4 rounded-2xl">
+              <span class="text-xs font-bold text-indigo-300 animate-pulse block">Waiting for night choices to complete...</span>
+            </div>
+          </div>
+        `;
+      }
+
+      const targets = G.players.filter(p => p.alive && p.role !== 'murderer' && p.role !== 'mafia');
       return `
         <div class="flex flex-col items-center text-center space-y-6 w-full">
           <div class="w-20 h-20 rounded-full bg-slate-950 border-2 border-red-500/60 flex items-center justify-center text-red-400 shadow-xl">
             <span class="text-3xl">🔪</span>
           </div>
           <div>
-            <h2 class="text-2xl font-black text-red-400">MURDERER OPENS EYES</h2>
-            <p class="text-xs text-slate-300 mt-1">Pass the phone privately to select who will be eliminated tonight.</p>
+            <h2 class="text-2xl font-black text-red-400">${G.mode === 'mafia' ? 'MAFIA SELECTION' : 'MURDERER SELECTION'}</h2>
+            <p class="text-xs text-slate-300 mt-1">Select a victim to eliminate tonight.</p>
           </div>
           <div class="w-full space-y-2 max-h-48 overflow-y-auto">
             ${targets.map(p => `
@@ -925,9 +943,13 @@
               </button>
             `).join('')}
           </div>
-          <button onclick="concludeNightPhase()" ${!G.murdererTargetId ? 'disabled class="w-full py-3.5 bg-slate-800 text-slate-500 font-bold rounded-xl text-sm cursor-not-allowed"' : 'class="w-full py-3.5 bg-red-600 hover:bg-red-500 text-white font-extrabold text-sm rounded-xl shadow-lg glow-blue transition-all cursor-pointer"'}>
-            Confirm Night Elimination &rarr;
-          </button>
+          ${G.isHost ? `
+            <button onclick="concludeNightPhase()" ${!G.murdererTargetId ? 'disabled class="w-full py-3.5 bg-slate-800 text-slate-500 font-bold rounded-xl text-sm cursor-not-allowed"' : 'class="w-full py-3.5 bg-red-600 hover:bg-red-500 text-white font-extrabold text-sm rounded-xl shadow-lg glow-blue transition-all cursor-pointer"'}>
+              Confirm Night Elimination &rarr;
+            </button>
+          ` : `
+            <p class="text-xs font-bold text-red-400">Target selected! Waiting for host to confirm night...</p>
+          `}
         </div>
       `;
     }
@@ -935,172 +957,15 @@
     function selectNightTarget(id) {
       sfx.click();
       G.murdererTargetId = id;
-      renderState();
-    }
-
-    function concludeNightPhase() {
-      sfx.elim();
-      if (G.murdererTargetId) {
-        const victim = G.players.find(p => p.id === G.murdererTargetId);
-        if (victim) {
-          victim.alive = false;
-          G.lastEliminatedPlayer = victim;
-          G.lastEliminatedForfeit = getRandomForfeit();
-        }
-      }
-
-      G.phase = 'morning_break';
-      if (G.netMode === 'online') broadcastState();
-      else renderState();
-    }
-
-    function renderMorningBreak() {
-      return `
-        <div class="flex flex-col items-center text-center space-y-6 w-full">
-          <div>
-            <div class="inline-flex items-center gap-2 px-4 py-1.5 bg-amber-950/70 border border-amber-500/30 rounded-full text-amber-300 text-xs font-bold tracking-widest uppercase mb-3 shadow-inner">
-              SUNRISE BREAK • ROUND ${G.roundCount}
-            </div>
-            <h2 class="text-3xl font-black text-amber-400">NIGHT CASUALTY REPORT</h2>
-          </div>
-          <div class="w-full bg-slate-950/60 border border-slate-800 p-5 rounded-2xl flex flex-col items-center space-y-3">
-            <span class="text-xs text-slate-400 font-bold uppercase tracking-widest">ELIMINATED OVERNIGHT</span>
-            ${G.lastEliminatedPlayer ? `
-              <span class="text-xl font-black text-red-400">${G.lastEliminatedPlayer.name} was eliminated!</span>
-              <div class="w-full bg-slate-900 border border-red-900/40 p-3 rounded-xl text-left">
-                <span class="text-[10px] text-red-400 font-bold uppercase tracking-widest block mb-0.5">Game Forfeit:</span>
-                <p class="text-xs font-semibold text-slate-200">${G.lastEliminatedForfeit}</p>
-              </div>
-            ` : `
-              <span class="text-xl font-black text-slate-300">A peaceful night. No one was killed.</span>
-            `}
-          </div>
-          <button onclick="goVoteBallot()" class="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-sm rounded-xl transition-all shadow-lg glow-blue cursor-pointer">
-            PROCEED TO GROUP VOTE &rarr;
-          </button>
-        </div>
-      `;
-    }
-
-    function goVoteBallot() {
-      if (checkWinConditions()) return;
-      G.phase = 'vote_ballot';
-      G.currentVoterIdx = 0;
-      G.votes = {};
-      if (G.netMode === 'online') broadcastState();
-      else renderState();
-      sfx.gong();
-    }
-
-    function renderVoteBallot() {
-      const livingPlayers = G.players.filter(p => p.alive);
-
-      if (G.netMode === 'online') {
-        const myPlayer = G.players.find(p => p.id === G.myPlayerId);
-        const hasVoted = G.votes[G.myPlayerId] !== undefined;
-
-        if (!myPlayer || !myPlayer.alive) {
-          return `
-            <div class="flex flex-col items-center text-center space-y-6 w-full">
-              <div class="inline-block px-3.5 py-1 bg-red-950 border border-red-500/40 text-red-300 text-xs font-bold uppercase rounded-full mb-2">
-                SPECTATOR MODE
-              </div>
-              <h2 class="text-2xl font-black text-white">VOTING IN PROGRESS</h2>
-              <p class="text-xs text-slate-400">You are eliminated. Waiting for living players to submit their votes (${Object.keys(G.votes).length}/${livingPlayers.length})...</p>
-            </div>
-          `;
-        }
-
-        if (hasVoted) {
-          return `
-            <div class="flex flex-col items-center text-center space-y-6 w-full">
-              <div class="inline-block px-3.5 py-1 bg-indigo-950 border border-indigo-500/40 text-indigo-300 text-xs font-bold uppercase rounded-full mb-2">
-                BALLOT SUBMITTED
-              </div>
-              <h2 class="text-2xl font-black text-emerald-400">VOTE RECORDED!</h2>
-              <p class="text-xs text-slate-300">Waiting for other players to finish voting (${Object.keys(G.votes).length}/${livingPlayers.length})...</p>
-            </div>
-          `;
-        }
-
-        return `
-          <div class="flex flex-col items-center text-center space-y-6 w-full">
-            <div>
-              <div class="inline-block px-3.5 py-1 bg-indigo-950 border border-indigo-500/40 text-indigo-300 text-xs font-bold uppercase rounded-full mb-2">
-                ONLINE BALLOT (${Object.keys(G.votes).length}/${livingPlayers.length} Voted)
-              </div>
-              <h2 class="text-2xl font-black text-white">CAST YOUR VOTE</h2>
-              <p class="text-xs text-slate-400 mt-1">Select a suspect to eliminate.</p>
-            </div>
-            <div class="w-full space-y-2 max-h-48 overflow-y-auto">
-              ${livingPlayers.filter(p => p.id !== G.myPlayerId).map(p => `
-                <button onclick="castBallot('${G.myPlayerId}', '${p.id}')" class="w-full p-3.5 bg-slate-900 hover:bg-slate-800 border border-slate-700/80 rounded-xl flex items-center justify-between font-bold text-sm text-slate-200 transition-all cursor-pointer">
-                  <span>${p.name}</span>
-                  <span class="text-xs text-blue-400">Vote &rarr;</span>
-                </button>
-              `).join('')}
-            </div>
-          </div>
-        `;
-      }
-
-      // Pass-The-Phone Mode logic
-      const currentVoter = livingPlayers[G.currentVoterIdx];
-      if (!currentVoter) {
-        tallyVotesAndEliminate();
-        return '';
-      }
-
-      return `
-        <div class="flex flex-col items-center text-center space-y-6 w-full">
-          <div>
-            <div class="inline-block px-3.5 py-1 bg-indigo-950 border border-indigo-500/40 text-indigo-300 text-xs font-bold uppercase rounded-full mb-2">
-              VOTING BALLOT (${G.currentVoterIdx + 1}/${livingPlayers.length})
-            </div>
-            <h2 class="text-2xl font-black text-white">${currentVoter.name}'S VOTE</h2>
-            <p class="text-xs text-slate-400 mt-1">Cast your vote to eliminate a suspect from the group.</p>
-          </div>
-          <div class="w-full space-y-2 max-h-48 overflow-y-auto">
-            ${livingPlayers.filter(p => p.id !== currentVoter.id).map(p => `
-              <button onclick="castBallot('${currentVoter.id}', '${p.id}')" class="w-full p-3.5 bg-slate-900 hover:bg-slate-800 border border-slate-700/80 rounded-xl flex items-center justify-between font-bold text-sm text-slate-200 transition-all cursor-pointer">
-                <span>${p.name}</span>
-                <span class="text-xs text-blue-400">Vote &rarr;</span>
-              </button>
-            `).join('')}
-          </div>
-        </div>
-      `;
-    }
-
-    function castBallot(voterId, targetId) {
-      sfx.click();
-      G.votes[voterId] = targetId;
-
       if (G.netMode === 'online') {
         if (!G.isHost) {
-          // Send vote to host peer
           const hostConn = peerConns.find(c => c && c.open);
-          if (hostConn) {
-            hostConn.send({ type: 'CAST_VOTE', voterId: voterId, targetId: targetId });
-          }
+          if (hostConn) hostConn.send({ type: 'SELECT_NIGHT_TARGET', targetId: id });
         } else {
-          const livingPlayers = G.players.filter(p => p.alive);
-          if (Object.keys(G.votes).length >= livingPlayers.length) {
-            tallyVotesAndEliminate();
-          } else {
-            broadcastState();
-          }
+          broadcastState();
         }
-        renderState();
-        return;
-      }
-
-      const livingPlayers = G.players.filter(p => p.alive);
-      if (G.currentVoterIdx + 1 < livingPlayers.length) {
-        G.currentVoterIdx++;
-        renderState();
       } else {
-        tallyVotesAndEliminate();
+        renderState();
       }
     }
 
