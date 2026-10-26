@@ -215,16 +215,19 @@
           let resolved = false;
           peer.on('open', (id) => { if (!resolved) { resolved = true; resolve(id); } });
           peer.on('connection', (conn) => {
-            if (!peerConns.includes(conn)) {
+            if (!peerConns.some(c => c.peer === conn.peer)) {
               peerConns.push(conn);
             }
             conn.on('data', (data) => handleIncomingData(data, conn));
             conn.on('close', () => {
               peerConns = peerConns.filter(c => c !== conn);
             });
+            conn.on('error', () => {
+              peerConns = peerConns.filter(c => c !== conn);
+            });
           });
           peer.on('error', () => { if (!resolved) { resolved = true; resolve(null); } });
-          setTimeout(() => { if (!resolved) { resolved = true; resolve(peer?.id || null); } }, 2000);
+          setTimeout(() => { if (!resolved) { resolved = true; resolve(peer?.id || null); } }, 3000);
         } catch(e) { resolve(null); }
       });
     }
@@ -262,6 +265,12 @@
           G.players.push(data.player);
         }
         broadcastState();
+      } else if (data.type === 'TOGGLE_READY') {
+        const player = G.players.find(p => p.id === data.playerId);
+        if (player) {
+          player.ready = data.ready;
+          if (G.isHost) broadcastState();
+        }
       } else if (data.type === 'SELECT_NIGHT_TARGET' && G.isHost) {
         G.murdererTargetId = data.targetId;
         broadcastState();
@@ -322,6 +331,22 @@
       });
       G.roundCount = 1;
       G.tiebreakerActive = false;
+    }
+
+    function toggleReadyState() {
+      sfx.click();
+      const myPlayer = G.players.find(p => p.id === G.myPlayerId);
+      if (!myPlayer) return;
+      myPlayer.ready = !myPlayer.ready;
+      if (G.isHost) {
+        broadcastState();
+      } else {
+        const hostConn = peerConns.find(c => c && c.open);
+        if (hostConn) {
+          hostConn.send({ type: 'TOGGLE_READY', playerId: G.myPlayerId, ready: myPlayer.ready });
+        }
+        renderState();
+      }
     }
 
     function renderState() {
@@ -510,6 +535,11 @@
         isInvalidSetup = true;
       }
 
+      const allReady = G.netMode === 'online' ? G.players.length >= 3 && G.players.every(p => p.ready) : true;
+      if (G.netMode === 'online' && !allReady && !isInvalidSetup && totalPlayers >= 3) {
+        warningMessage = '⏳ Waiting for all connected players to hit "Ready" standard before game start!';
+      }
+
       const warningHTML = warningMessage ? `
         <div class="w-full bg-amber-950/70 border border-amber-500/50 p-3 rounded-xl text-amber-300 text-xs font-bold text-center animate-fade-in shadow-inner">
           ${warningMessage}
@@ -544,6 +574,9 @@
           </div>
         `;
       } else {
+        const myPlayer = G.players.find(p => p.id === G.myPlayerId);
+        const isReady = myPlayer ? myPlayer.ready : false;
+
         return `
           <div class="flex flex-col items-center w-full space-y-4">
             ${settingsHTML}
@@ -554,11 +587,13 @@
                 <span class="text-3xl font-extrabold text-indigo-400 tracking-widest">${G.roomCode}</span>
               </div>
             ` : `
-              <div class="w-full space-y-3">
-                <input type="text" id="handleInput" placeholder="Your Handle..." class="w-full bg-slate-900/80 border border-slate-700/80 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-500 text-white">
+              <div class="w-full space-y-3 text-left">
+                <label class="text-xs font-bold text-slate-300 uppercase tracking-wider block">Your Name / Handle <span class="text-red-400">*</span></label>
+                <input type="text" id="handleInput" placeholder="Enter your name first..." class="w-full bg-slate-900/80 border border-slate-700/80 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-500 text-white placeholder-slate-500" onkeyup="checkHandleInput(this.value)">
+                <div id="nameRequiredError" class="text-[11px] text-amber-400 font-bold hidden">⚠️ Please enter your name before creating or joining a room.</div>
                 <div class="grid grid-cols-2 gap-3">
-                  <button onclick="createOnlineRoom()" class="py-3.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-sm transition-all cursor-pointer">Create Room</button>
-                  <button onclick="openJoinModal()" class="py-3.5 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl text-sm transition-all cursor-pointer">Join Room</button>
+                  <button id="createRoomBtn" onclick="createOnlineRoom()" class="py-3.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-sm transition-all cursor-pointer">Create Room</button>
+                  <button id="joinRoomBtn" onclick="openJoinModal()" class="py-3.5 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl text-sm transition-all cursor-pointer">Join Room</button>
                 </div>
               </div>
             `}
@@ -567,12 +602,24 @@
               ${G.players.map(p => `
                 <div class="flex items-center justify-between bg-slate-900/90 border border-slate-800 rounded-xl px-4 py-2 text-sm">
                   <span class="font-semibold text-slate-200">${p.name} ${p.id === G.myPlayerId ? '(You)' : ''}</span>
-                  ${p.id === G.myPlayerId ? '<span class="text-xs bg-indigo-950 text-indigo-400 border border-indigo-800 px-2 py-0.5 rounded-full font-bold">HOST</span>' : ''}
+                  <div class="flex items-center gap-2">
+                    ${p.id === G.myPlayerId && G.isHost ? '<span class="text-xs bg-indigo-950 text-indigo-400 border border-indigo-800 px-2 py-0.5 rounded-full font-bold">HOST</span>' : ''}
+                    <span class="text-xs px-2.5 py-1 rounded-full font-extrabold ${p.ready ? 'bg-emerald-950 text-emerald-400 border border-emerald-500/50' : 'bg-slate-800 text-slate-500'}">
+                      ${p.ready ? 'READY' : 'NOT READY'}
+                    </span>
+                  </div>
                 </div>
               `).join('')}
             </div>
+
+            ${G.roomCode ? `
+              <button onclick="toggleReadyState()" class="w-full py-3 bg-slate-800 hover:bg-slate-700 border ${isReady ? 'border-emerald-500 text-emerald-400' : 'border-slate-600 text-white'} font-extrabold text-sm rounded-xl transition-all cursor-pointer">
+                ${isReady ? '✓ YOU ARE READY (Click to Unready)' : 'CLICK TO READY UP'}
+              </button>
+            ` : ''}
+
             ${G.isHost && G.roomCode ? `
-              <button onclick="startGame()" ${isInvalidSetup || G.players.length < 3 ? 'disabled class="w-full py-3.5 bg-slate-800 text-slate-500 font-bold rounded-xl text-sm cursor-not-allowed opacity-60"' : 'class="w-full py-3.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-sm shadow-lg glow-blue transition-all cursor-pointer"'}>Start Multi-Device Game</button>
+              <button onclick="startGame()" ${isInvalidSetup || G.players.length < 3 || !allReady ? 'disabled class="w-full py-3.5 bg-slate-800 text-slate-500 font-bold rounded-xl text-sm cursor-not-allowed opacity-60"' : 'class="w-full py-3.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-sm shadow-lg glow-blue transition-all cursor-pointer"'}>Start Multi-Device Game</button>
             ` : ''}
             <button onclick="G.phase='mode_select'; renderState();" class="text-xs text-slate-400 hover:text-white transition-colors pt-1 cursor-pointer">&larr; Back to Main Screen</button>
           </div>
@@ -588,6 +635,7 @@
         id: 'p_' + Math.random().toString(36).substr(2, 9),
         name: input.value.trim(),
         role: '',
+        ready: true,
         alive: true
       });
       input.value = '';
@@ -600,19 +648,43 @@
       renderState();
     }
 
-    async function createOnlineRoom() {
+    function checkHandleInput(val) {
+      const err = document.getElementById('nameRequiredError');
+      if (err && val.trim().length > 0) {
+        err.classList.add('hidden');
+      }
+    }
+
+    function getValidatedHandle() {
       const handleInput = document.getElementById('handleInput');
-      const name = handleInput && handleInput.value.trim() ? handleInput.value.trim() : 'Host Player';
+      const name = handleInput ? handleInput.value.trim() : '';
+      const err = document.getElementById('nameRequiredError');
+      if (!name) {
+        if (err) err.classList.remove('hidden');
+        if (handleInput) handleInput.focus();
+        return null;
+      }
+      if (err) err.classList.add('hidden');
+      return name;
+    }
+
+    async function createOnlineRoom() {
+      const name = getValidatedHandle();
+      if (!name) return;
+      
       sfx.click();
       G.roomCode = generateCode();
       G.myPlayerId = 'p_' + Math.random().toString(36).substr(2, 9);
       G.isHost = true;
-      G.players = [{ id: G.myPlayerId, name: name, role: '', alive: true }];
+      G.players = [{ id: G.myPlayerId, name: name, role: '', ready: true, alive: true }];
       await initPeer('imposter_room_' + G.roomCode);
       renderState();
     }
 
     function openJoinModal() {
+      const name = getValidatedHandle();
+      if (!name) return;
+
       sfx.click();
       const modal = document.getElementById('joinModal');
       const input = document.getElementById('modalRoomCodeInput');
@@ -630,13 +702,14 @@
     }
 
     async function submitJoinModal() {
+      const name = getValidatedHandle();
+      if (!name) return;
+
       const input = document.getElementById('modalRoomCodeInput');
       const code = input ? input.value.trim() : '';
       if (!code || code.length < 4) return;
       
       closeJoinModal();
-      const handleInput = document.getElementById('handleInput');
-      const name = handleInput && handleInput.value.trim() ? handleInput.value.trim() : 'Player';
       sfx.click();
       G.roomCode = code.toUpperCase();
       G.myPlayerId = 'p_' + Math.random().toString(36).substr(2, 9);
@@ -644,12 +717,14 @@
       await initPeer();
       const hostPeerId = 'imposter_room_' + G.roomCode;
       try {
-        const conn = peer.connect(hostPeerId);
-        peerConns.push(conn);
+        const conn = peer.connect(hostPeerId, { reliable: true });
+        if (!peerConns.some(c => c.peer === conn.peer)) {
+          peerConns.push(conn);
+        }
         conn.on('open', () => {
           conn.send({
             type: 'JOIN_REQUEST',
-            player: { id: G.myPlayerId, name: name, role: '', alive: true }
+            player: { id: G.myPlayerId, name: name, role: '', ready: false, alive: true }
           });
         });
         conn.on('data', (data) => handleIncomingData(data, conn));
