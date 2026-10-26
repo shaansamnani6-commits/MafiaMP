@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Who Is The Imposter? - Beta Squad Edition</title>
+  <title>Who Is The Imposter? - Beta Squad Style Edition</title>
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- PeerJS for P2P Networking -->
@@ -60,7 +60,7 @@
     <!-- Header -->
     <header class="text-center mb-6">
       <div class="inline-flex items-center gap-2 px-4 py-1.5 bg-indigo-950/70 border border-indigo-500/30 rounded-full text-indigo-300 text-xs font-bold tracking-widest uppercase mb-3 shadow-inner">
-        <span id="gameModeBadge">BETA SQUAD STYLE EDITION</span>
+        <span id="gameModeBadge">PARTY & MAFIA EDITION</span>
       </div>
       <h1 id="headerTitle" class="text-3xl sm:text-4xl font-extrabold tracking-tight text-white">
         Who Is The Imposter?
@@ -128,7 +128,7 @@
 
   <!-- Game State & Controller -->
   <script>
-    let G = {
+    const G = {
       mode: 'murder_mystery', // 'murder_mystery' or 'mafia'
       imposterCountMode: 'auto',
       netMode: 'pass_phone',
@@ -136,7 +136,7 @@
       isHost: true,
       myPlayerId: '',
       players: [],
-      phase: 'mode_select',
+      phase: 'splash', // Start with opening splash slide
       currentRevealIdx: 0,
       showCardModal: false,
       currentVoterIdx: 0,
@@ -151,11 +151,11 @@
       roundCount: 1
     };
 
-    const betaSquadForfeits = [
+    const gameForfeits = [
       "Must wear a blindfold during the next entire discussion cycle!",
       "Must speak in a dramatic British accent for the rest of the game!",
       "Must sit facing the wall during the next interrogation round!",
-      "Hand over your jacket / phone to the group until the game concludes!",
+      "Hand over your jacket or phone to the group until the game concludes!",
       "Must answer every question with a question for the next 2 rounds!",
       "Must do 20 push-ups right now in the center of the room!"
     ];
@@ -182,7 +182,7 @@
     }
 
     function getRandomForfeit() {
-      return betaSquadForfeits[Math.floor(Math.random() * betaSquadForfeits.length)];
+      return gameForfeits[Math.floor(Math.random() * gameForfeits.length)];
     }
 
     let peer = null;
@@ -215,7 +215,7 @@
 
     function handleIncomingData(data) {
       if (data.type === 'STATE_UPDATE') {
-        G = data.state;
+        Object.assign(G, data.state);
         renderState();
       } else if (data.type === 'JOIN_REQUEST' && G.isHost) {
         if (!G.players.find(p => p.id === data.player.id)) {
@@ -248,10 +248,12 @@
       const total = G.players.length;
       let badCount = 1;
       if (G.imposterCountMode === 'auto') {
-        if (total >= 8 && total <= 10) badCount = 2;
+        if (total >= 7 && total <= 10) badCount = 2;
         else if (total > 10) badCount = 3;
       } else {
-        badCount = Math.min(parseInt(G.imposterCountMode, 10), Math.floor(total / 2));
+        // Prevent setting bad count equal to half or more than half of starting players
+        badCount = Math.min(parseInt(G.imposterCountMode, 10), Math.floor((total - 1) / 2));
+        if (badCount < 1) badCount = 1;
       }
 
       let roles = [];
@@ -269,6 +271,7 @@
         p.alive = true;
       });
       G.roundCount = 1;
+      G.tiebreakerActive = false;
     }
 
     function renderState() {
@@ -277,12 +280,20 @@
       const title = document.getElementById('headerTitle');
       const sub = document.getElementById('headerSubtitle');
 
+      if (G.phase === 'splash') {
+        badge.textContent = 'PARTY & MAFIA EDITION';
+        title.textContent = 'Who Is The Imposter?';
+        sub.textContent = 'Multi-round deductions, dramatic eliminations, and game forfeits!';
+        container.innerHTML = renderSplash();
+        return;
+      }
+
       if (G.mode === 'murder_mystery') {
         badge.textContent = 'MURDER MYSTERY EDITION';
         title.textContent = 'Manor Murder Mystery';
         sub.textContent = 'Find the murderer before you are eliminated in the dark!';
       } else {
-        badge.textContent = 'BETA SQUAD MAFIA EDITION';
+        badge.textContent = 'CLASSIC MAFIA EDITION';
         title.textContent = 'Classic Mafia';
         sub.textContent = 'Multi-round debates, secret alliances, and elimination forfeits.';
       }
@@ -321,6 +332,30 @@
       }
     }
 
+    function renderSplash() {
+      return `
+        <div class="flex flex-col items-center text-center space-y-6 w-full py-6 animate-fade-in">
+          <div class="relative w-28 h-28 rounded-full bg-slate-950 border-2 border-indigo-500/60 flex items-center justify-center glow-indigo mb-2 shadow-2xl">
+            <span class="text-4xl">🎭</span>
+          </div>
+          <div class="space-y-1">
+            <h2 class="text-4xl sm:text-5xl font-black tracking-tight text-white uppercase drop-shadow-lg">
+              MAFIA
+            </h2>
+            <p class="text-xs font-bold text-indigo-400 tracking-widest uppercase">
+              (be prepared)
+            </p>
+          </div>
+          <p class="text-xs text-slate-400 max-w-xs leading-relaxed px-4">
+            Deceive your friends, survive the interrogations, and uncover the truth before time runs out.
+          </p>
+          <button onclick="sfx.click(); G.phase='mode_select'; renderState();" class="w-full py-4 mt-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-extrabold text-base rounded-2xl shadow-xl hover:opacity-95 transition-all glow-blue cursor-pointer">
+            ENTER GAME &rarr;
+          </button>
+        </div>
+      `;
+    }
+
     function renderModeSelect() {
       const isMystery = G.mode === 'murder_mystery';
       const isPassPhone = G.netMode === 'pass_phone';
@@ -334,10 +369,10 @@
                 <h3 class="text-xl font-bold text-white group-hover:text-blue-400 transition-colors">Murder Mystery</h3>
               </div>
               <p class="text-xs text-slate-400 max-w-xs leading-relaxed">
-                Roles: Murderer and Manor Guest. Features 3-min discussion, night kills, and ballot votes.
+                Roles: Murderer, Manor Guest. Features 3-min discussion, night kills, and ballot votes.
               </p>
             </div>
-            <span class="px-4 py-1.5 ${isMystery ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-400'} text-xs font-bold rounded-full shadow-md whitespace-nowrap">
+            <span class="px-4 py-1.5 ${isMystery ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-800 text-slate-400'} text-xs font-bold rounded-full whitespace-nowrap">
               Mystery
             </span>
           </button>
@@ -352,7 +387,7 @@
                 Roles: Mafia and Civilian. Features continuous 5-minute discussion timers alternating with voting ballots.
               </p>
             </div>
-            <span class="px-4 py-1.5 ${!isMystery ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-400'} text-xs font-bold rounded-full shadow-md whitespace-nowrap">
+            <span class="px-4 py-1.5 ${!isMystery ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-800 text-slate-400'} text-xs font-bold rounded-full whitespace-nowrap">
               Classic
             </span>
           </button>
@@ -404,14 +439,42 @@
         </div>
       `;
 
+      // Validation logic for player count vs mafia ratio
+      const totalPlayers = G.players.length;
+      let targetBadCount = 1;
+      if (G.imposterCountMode === 'auto') {
+        if (totalPlayers >= 7 && totalPlayers <= 10) targetBadCount = 2;
+        else if (totalPlayers > 10) targetBadCount = 3;
+      } else {
+        targetBadCount = parseInt(G.imposterCountMode, 10);
+      }
+
+      let warningMessage = '';
+      let isInvalidSetup = false;
+
+      if (totalPlayers > 0 && totalPlayers < 3) {
+        warningMessage = '⚠️ Need at least 3 players to start the game!';
+        isInvalidSetup = true;
+      } else if (totalPlayers >= 3 && targetBadCount >= Math.ceil(totalPlayers / 2)) {
+        warningMessage = `⚠️ Uneven Game! ${targetBadCount} ${G.mode === 'mafia' ? 'Mafia' : 'Murderer'}(s) is too high for ${totalPlayers} players (must be less than half). Add more players or lower the count!`;
+        isInvalidSetup = true;
+      }
+
+      const warningHTML = warningMessage ? `
+        <div class="w-full bg-amber-950/70 border border-amber-500/50 p-3 rounded-xl text-amber-300 text-xs font-bold text-center animate-fade-in shadow-inner">
+          ${warningMessage}
+        </div>
+      ` : '';
+
       if (G.netMode === 'pass_phone') {
         return `
           <div class="flex flex-col items-center w-full space-y-4">
             ${settingsHTML}
+            ${warningHTML}
             <div class="w-full space-y-2 text-left">
               <label class="text-xs font-bold text-slate-300 uppercase tracking-wider block">Add Players (Min 3)</label>
               <div class="flex gap-2 w-full">
-                <input type="text" id="playerNameInput" placeholder="Enter player name..." class="flex-1 bg-slate-900/80 border border-slate-700/80 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-500 text-white placeholder-slate-500">
+                <input type="text" id="playerNameInput" placeholder="Enter player name..." class="flex-1 bg-slate-900/80 border border-slate-700/80 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-500 text-white placeholder-slate-500" onkeypress="if(event.key==='Enter') addPassPlayer()">
                 <button onclick="addPassPlayer()" class="bg-blue-600 hover:bg-blue-500 text-white font-bold px-6 py-3 rounded-xl transition-all shadow-md cursor-pointer">Add</button>
               </div>
             </div>
@@ -426,7 +489,7 @@
             </div>
             <div class="flex gap-3 w-full pt-2">
               <button onclick="G.phase='mode_select'; renderState();" class="w-1/3 py-3.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-sm transition-all cursor-pointer">Back</button>
-              <button onclick="startGame()" ${G.players.length < 3 ? 'disabled class="w-2/3 py-3.5 bg-slate-800 text-slate-500 font-bold rounded-xl text-sm cursor-not-allowed"' : 'class="w-2/3 py-3.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-sm shadow-lg glow-blue transition-all cursor-pointer"'}>Start Game (${G.players.length})</button>
+              <button onclick="startGame()" ${isInvalidSetup || G.players.length < 3 ? 'disabled class="w-2/3 py-3.5 bg-slate-800 text-slate-500 font-bold rounded-xl text-sm cursor-not-allowed opacity-60"' : 'class="w-2/3 py-3.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-sm shadow-lg glow-blue transition-all cursor-pointer"'}>Start Game (${G.players.length})</button>
             </div>
           </div>
         `;
@@ -434,6 +497,7 @@
         return `
           <div class="flex flex-col items-center w-full space-y-4">
             ${settingsHTML}
+            ${warningHTML}
             ${G.roomCode ? `
               <div class="bg-slate-950/80 border border-indigo-500/40 p-3.5 rounded-2xl text-center w-full">
                 <span class="text-xs text-slate-400 uppercase tracking-widest block mb-0.5">Room Code</span>
@@ -458,7 +522,7 @@
               `).join('')}
             </div>
             ${G.isHost && G.roomCode ? `
-              <button onclick="startGame()" ${G.players.length < 3 ? 'disabled class="w-full py-3.5 bg-slate-800 text-slate-500 font-bold rounded-xl text-sm cursor-not-allowed"' : 'class="w-full py-3.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-sm shadow-lg glow-blue transition-all cursor-pointer"'}>Start Multi-Device Game</button>
+              <button onclick="startGame()" ${isInvalidSetup || G.players.length < 3 ? 'disabled class="w-full py-3.5 bg-slate-800 text-slate-500 font-bold rounded-xl text-sm cursor-not-allowed opacity-60"' : 'class="w-full py-3.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-sm shadow-lg glow-blue transition-all cursor-pointer"'}>Start Multi-Device Game</button>
             ` : ''}
             <button onclick="G.phase='mode_select'; renderState();" class="text-xs text-slate-400 hover:text-white transition-colors pt-1 cursor-pointer">&larr; Back to Main Screen</button>
           </div>
@@ -577,7 +641,7 @@
           <div class="w-full bg-slate-950/60 border border-slate-800 rounded-3xl p-6 flex flex-col items-center">
             <span class="text-xs text-slate-400 uppercase tracking-widest font-bold">PASS PHONE TO</span>
             <h2 class="text-3xl font-extrabold text-white mt-1">${p.name}</h2>
-            <p class="text-xs text-slate-400 mt-2">Beta Squad Rule: Keep your secret card hidden!</p>
+            <p class="text-xs text-slate-400 mt-2">Keep your secret card hidden!</p>
           </div>
 
           ${!G.showCardModal ? `
@@ -660,7 +724,7 @@
           </div>
           <div class="w-full bg-indigo-950/40 border border-indigo-500/30 rounded-2xl p-4 text-left space-y-1">
             <div class="flex items-center justify-between">
-              <span class="text-[10px] text-indigo-400 font-bold uppercase tracking-wider">Beta Squad Interrogation Prompt</span>
+              <span class="text-[10px] text-indigo-400 font-bold uppercase tracking-wider">Interrogation Prompt</span>
               <button onclick="shufflePrompt()" class="text-[10px] text-indigo-300 hover:text-white underline font-semibold cursor-pointer">Shuffle Prompt</button>
             </div>
             <p id="interrogationPromptText" class="text-sm font-bold text-white">${G.currentPrompt}</p>
@@ -780,10 +844,6 @@
         }
       }
 
-      // Do NOT check win conditions before morning votes; proceed to morning break so players can discuss & vote!
-      // Increment round count when moving to morning break
-      G.roundCount++;
-
       G.phase = 'morning_break';
       if (G.netMode === 'online') broadcastState();
       else renderState();
@@ -794,7 +854,7 @@
         <div class="flex flex-col items-center text-center space-y-6 w-full">
           <div>
             <div class="inline-flex items-center gap-2 px-4 py-1.5 bg-amber-950/70 border border-amber-500/30 rounded-full text-amber-300 text-xs font-bold tracking-widest uppercase mb-3 shadow-inner">
-              SUNRISE BREAK • ROUND ${G.roundCount - 1}
+              SUNRISE BREAK • ROUND ${G.roundCount}
             </div>
             <h2 class="text-3xl font-black text-amber-400">NIGHT CASUALTY REPORT</h2>
           </div>
@@ -803,7 +863,7 @@
             ${G.lastEliminatedPlayer ? `
               <span class="text-xl font-black text-red-400">${G.lastEliminatedPlayer.name} was eliminated!</span>
               <div class="w-full bg-slate-900 border border-red-900/40 p-3 rounded-xl text-left">
-                <span class="text-[10px] text-red-400 font-bold uppercase tracking-widest block mb-0.5">Beta Squad Game Forfeit:</span>
+                <span class="text-[10px] text-red-400 font-bold uppercase tracking-widest block mb-0.5">Game Forfeit:</span>
                 <p class="text-xs font-semibold text-slate-200">${G.lastEliminatedForfeit}</p>
               </div>
             ` : `
@@ -895,23 +955,49 @@
           p.alive = false;
           G.lastEliminatedPlayer = p;
           G.lastEliminatedForfeit = getRandomForfeit();
+          G.tiebreakerActive = false;
         }
       } else {
         G.lastEliminatedPlayer = null;
+        // Check for 1v1 stalemate during tie vote
+        const livingPlayers = G.players.filter(p => p.alive);
+        const badTeam = livingPlayers.filter(p => p.role === 'mafia' || p.role === 'murderer');
+        const goodTeam = livingPlayers.filter(p => p.role !== 'mafia' && p.role !== 'murderer');
+
+        // Sudden death rule: If 1v1 tie or 2 consecutive ties, trigger coin toss / sudden death forfeit
+        if (livingPlayers.length === 2 && badTeam.length === 1 && goodTeam.length === 1) {
+          G.tiebreakerActive = true;
+        }
       }
 
-      if (checkWinConditions()) return;
-
+      // ALWAYS transition to vote_results screen first
       G.phase = 'vote_results';
       if (G.netMode === 'online') broadcastState();
       else renderState();
     }
 
+    function resolveSuddenDeathCoinToss() {
+      sfx.gong();
+      const livingPlayers = G.players.filter(p => p.alive);
+      // Pick one randomly for sudden death elimination
+      const loser = livingPlayers[Math.floor(Math.random() * livingPlayers.length)];
+      loser.alive = false;
+      G.lastEliminatedPlayer = loser;
+      G.lastEliminatedForfeit = "SUDDEN DEATH COIN FLIP: " + getRandomForfeit();
+      G.tiebreakerActive = false;
+      checkWinConditions();
+    }
+
     function renderVoteResults() {
+      const livingPlayers = G.players.filter(p => p.alive);
+      const badTeam = livingPlayers.filter(p => p.role === 'mafia' || p.role === 'murderer');
+      const goodTeam = livingPlayers.filter(p => p.role !== 'mafia' && p.role !== 'murderer');
+
       return `
-        <div class="flex flex-col items-center text-center space-y-6 w-full">
+        <div class="flex flex-col items-center text-center space-y-6 w-full animate-fade-in">
           <div>
-            <h2 class="text-3xl font-black text-white">VOTING RESULTS</h2>
+            <span class="text-xs font-bold text-slate-400 uppercase tracking-widest block">ROUND ${G.roundCount} VOTE CONCLUSION</span>
+            <h2 class="text-3xl font-black text-white mt-1">VOTING RESULTS</h2>
           </div>
           ${G.lastEliminatedPlayer ? `
             <div class="w-full bg-red-950/40 border border-red-800/60 p-5 rounded-2xl flex flex-col items-center space-y-3">
@@ -919,27 +1005,49 @@
               <span class="text-2xl font-black text-white">${G.lastEliminatedPlayer.name}</span>
               <span class="text-xs text-slate-300">True identity: <strong class="text-red-400 uppercase">${G.lastEliminatedPlayer.role.replace('_', ' ')}</strong></span>
               <div class="w-full bg-slate-900 border border-red-900/40 p-3 rounded-xl text-left mt-2">
-                <span class="text-[10px] text-red-400 font-bold uppercase tracking-widest block mb-0.5">Beta Squad Game Forfeit:</span>
+                <span class="text-[10px] text-red-400 font-bold uppercase tracking-widest block mb-0.5">Game Forfeit:</span>
                 <p class="text-xs font-semibold text-slate-200">${G.lastEliminatedForfeit}</p>
               </div>
             </div>
           ` : `
-            <div class="w-full bg-slate-900/90 border border-slate-700/80 p-5 rounded-2xl">
-              <span class="text-base font-bold text-amber-400">TIE VOTE!</span>
-              <p class="text-xs text-slate-400 mt-1">No one was eliminated due to a tied vote.</p>
+            <div class="w-full bg-slate-900/90 border border-amber-500/50 p-5 rounded-2xl space-y-2">
+              <span class="text-xl font-black text-amber-400">STALEMATE TIE VOTE!</span>
+              <p class="text-xs text-slate-300">Neither player yielded their vote.</p>
+              ${G.tiebreakerActive ? `
+                <div class="mt-3 p-3 bg-red-950/70 border border-red-500/50 rounded-xl text-xs text-red-300 font-bold">
+                  ⚡ 1v1 DEADLOCK TRIGGERED! Flip a coin to force sudden death elimination!
+                </div>
+              ` : ''}
             </div>
           `}
-          <button onclick="advanceRound()" class="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-sm rounded-xl transition-all shadow-lg glow-blue cursor-pointer">
-            START ROUND ${G.roundCount} ${G.mode === 'mafia' ? 'DEBATE' : 'INVESTIGATION'} &rarr;
-          </button>
+
+          <!-- Display remaining alive counts for full clarity -->
+          <div class="w-full bg-slate-950/40 border border-slate-800 rounded-xl p-3 flex justify-between text-xs font-bold text-slate-300">
+            <span>Remaining Alive: ${livingPlayers.length}</span>
+            <span>(${goodTeam.length} ${G.mode === 'mafia' ? 'Civilians' : 'Guests'}, ${badTeam.length} ${G.mode === 'mafia' ? 'Mafia' : 'Murderers'})</span>
+          </div>
+
+          ${G.tiebreakerActive ? `
+            <button onclick="resolveSuddenDeathCoinToss()" class="w-full py-4 bg-red-600 hover:bg-red-500 text-white font-extrabold text-sm rounded-xl transition-all shadow-lg glow-blue cursor-pointer">
+              🎲 FLIP COIN FOR SUDDEN DEATH ELIMINATION &rarr;
+            </button>
+          ` : `
+            <button onclick="advanceRoundOrEnd()" class="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-sm rounded-xl transition-all shadow-lg glow-blue cursor-pointer">
+              CONTINUE GAME &rarr;
+            </button>
+          `}
         </div>
       `;
     }
 
-    function advanceRound() {
+    function advanceRoundOrEnd() {
       sfx.click();
+      // Check if win conditions are met
+      if (checkWinConditions()) return;
+
+      // If game is not over, proceed to next round!
+      G.roundCount++;
       if (G.mode === 'mafia') {
-        G.roundCount++;
         startDiscussion();
       } else {
         goToNightApproaching();
@@ -952,6 +1060,7 @@
 
       if (G.players.length === 0) return false;
 
+      // Good team wins if ALL bad team members are dead
       if (badTeam.length === 0) {
         G.winner = G.mode === 'mafia' ? 'CIVILIANS' : 'MANOR GUESTS';
         G.phase = 'game_over';
@@ -959,13 +1068,17 @@
         else renderState();
         return true;
       }
-      if (badTeam.length >= goodTeam.length) {
+
+      // Bad team wins ONLY when 2 bad team (Mafia/Murderer) vs 1 good team (Civilian/Guest), or good team reaches 0
+      if (goodTeam.length === 0 || (badTeam.length === 2 && goodTeam.length === 1)) {
         G.winner = G.mode === 'mafia' ? 'MAFIA' : 'MURDERER';
         G.phase = 'game_over';
         if (G.netMode === 'online') broadcastState();
         else renderState();
         return true;
       }
+
+      // Game continues!
       return false;
     }
 
