@@ -1,1364 +1,1156 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Mafia: Who Is The Imposter?</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    colors: {
-                        mafia: {
-                            black: '#0a0d14',
-                            card: '#111625',
-                            navy: '#1e293b',
-                            blue: '#3b82f6',
-                            cyan: '#38bdf8',
-                            accent: '#60a5fa',
-                            light: '#f8fafc',
-                            muted: '#94a3b8'
-                        }
-                    },
-                    fontFamily: {
-                        sans: ['Plus Jakarta Sans', 'Inter', 'sans-serif']
-                    },
-                    animation: {
-                        'pulse-glow': 'pulseGlow 2s infinite',
-                        'float': 'float 3s ease-in-out infinite'
-                    },
-                    keyframes: {
-                        pulseGlow: {
-                            '0%, 100%': { boxShadow: '0 0 15px rgba(59, 130, 246, 0.3)' },
-                            '50%': { boxShadow: '0 0 30px rgba(59, 130, 246, 0.6)' }
-                        },
-                        float: {
-                            '0%, 100%': { transform: 'translateY(0px)' },
-                            '50%': { transform: 'translateY(-6px)' }
-                        }
-                    }
-                }
-            }
-        }
-    </script>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;700;800;900&display=swap');
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Who Is The Imposter? - Party & Mafia Games</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- PeerJS for P2P Networking -->
+  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+  <!-- Google Font: Plus Jakarta Sans -->
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background: #0d1124;
+      background: radial-gradient(circle at top, #1a2246 0%, #0d1124 100%);
+      color: #ffffff;
+      user-select: none;
+      min-height: 100vh;
+    }
 
-        * {
-            -webkit-tap-highlight-color: transparent;
-            user-select: none;
-        }
+    .card-glass {
+      background: rgba(22, 30, 60, 0.65);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
+    }
 
-        body {
-            font-family: 'Plus Jakarta Sans', sans-serif;
-            background: radial-gradient(circle at top center, #111827 0%, #030712 100%);
-            color: #ffffff;
-            min-height: 100vh;
-        }
+    .card-interactive {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .card-interactive:hover {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: rgba(99, 102, 241, 0.5);
+      transform: translateY(-2px);
+    }
 
-        .custom-scrollbar::-webkit-scrollbar {
-            width: 4px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-track {
-            background: rgba(255, 255, 255, 0.02);
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-            background: #3b82f6;
-            border-radius: 9999px;
-        }
+    .glow-blue {
+      box-shadow: 0 0 30px rgba(59, 130, 246, 0.35);
+    }
+    .glow-indigo {
+      box-shadow: 0 0 30px rgba(99, 102, 241, 0.4);
+    }
 
-        .beta-card {
-            background: rgba(17, 24, 39, 0.85);
-            backdrop-filter: blur(16px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-        }
+    @keyframes pulse-slow {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.02); opacity: 0.9; }
+    }
+    .animate-pulse-slow { animation: pulse-slow 3s infinite ease-in-out; }
 
-        .avatar-gradient-1 { background: linear-gradient(135deg, #3b82f6, #1d4ed8); }
-        .avatar-gradient-2 { background: linear-gradient(135deg, #38bdf8, #0284c7); }
-        .avatar-gradient-3 { background: linear-gradient(135deg, #64748b, #334155); }
-        .avatar-gradient-4 { background: linear-gradient(135deg, #f8fafc, #cbd5e1); }
-        .avatar-gradient-5 { background: linear-gradient(135deg, #60a5fa, #2563eb); }
-    </style>
-
-    <!-- PeerJS for Free Multi-Device Networking -->
-    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
-
-    <!-- Firebase Module Setup -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, setDoc, getDoc, updateDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-        window.firebaseImports = {
-            initializeApp, getAuth, signInAnonymously,
-            getFirestore, doc, setDoc, getDoc, updateDoc, onSnapshot
-        };
-    </script>
+    @keyframes float {
+      0%, 100% { transform: translateY(0px); }
+      50% { transform: translateY(-6px); }
+    }
+    .animate-float { animation: float 4s infinite ease-in-out; }
+  </style>
 </head>
-<body class="flex flex-col justify-between min-h-screen text-slate-100 p-3 sm:p-5">
+<body class="flex flex-col items-center justify-center p-4 overflow-x-hidden relative min-h-screen">
 
-    <!-- Top Navigation Header -->
-    <header class="w-full max-w-md mx-auto flex justify-between items-center z-20 py-2">
-        <div class="flex items-center gap-3">
-            <div class="w-11 h-11 rounded-2xl bg-gradient-to-tr from-blue-600 via-slate-800 to-sky-400 flex items-center justify-center font-black text-xl shadow-lg shadow-blue-500/20 border border-white/20 animate-float text-white">
-                M
-            </div>
-            <div>
-                <h1 class="font-black text-xl leading-none tracking-tight bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
-                    MAFIA
-                </h1>
-                <span class="text-[10px] font-black text-blue-400 uppercase tracking-widest block mt-0.5">Who Is The Imposter?</span>
-            </div>
-        </div>
-
-        <!-- Room Code Badge -->
-        <div id="roomBadge" class="hidden px-3.5 py-1.5 rounded-xl bg-blue-500/10 border border-blue-400/30 text-blue-400 font-black text-xs tracking-wider flex items-center gap-2 shadow-md">
-            <span class="w-2 h-2 rounded-full bg-blue-400 animate-ping"></span>
-            CODE: <span id="roomCodeDisplay" class="text-white">----</span>
-        </div>
+  <!-- Main App Window Container -->
+  <div id="app" class="w-full max-w-xl card-glass rounded-[32px] p-6 sm:p-10 relative z-10 overflow-hidden my-auto">
+    <!-- Dynamic Header -->
+    <header class="text-center mb-8">
+      <div class="inline-flex items-center gap-2 px-4 py-1.5 bg-indigo-950/70 border border-indigo-500/30 rounded-full text-indigo-300 text-xs font-bold tracking-widest uppercase mb-3 shadow-inner">
+        <span id="gameModeBadge">PARTY GAME EDITION</span>
+      </div>
+      <h1 id="headerTitle" class="text-3xl sm:text-4xl font-extrabold tracking-tight text-white">
+        Who Is The Imposter?
+      </h1>
+      <p id="headerSubtitle" class="text-xs sm:text-sm text-slate-400 mt-2 font-medium max-w-md mx-auto">
+        Find out which member of your crew is hiding the secret identity!
+      </p>
     </header>
 
-    <!-- Main Dynamic Screen Viewport -->
-    <main class="w-full max-w-md mx-auto my-auto py-4 flex-1 flex flex-col justify-center">
-
-        <!-- SCREEN 0: MODE SELECT -->
-        <div id="modeSelectScreen" class="space-y-6 text-center animate-fade-in">
-            <div class="space-y-2">
-                <span class="px-3 py-1 rounded-full bg-white/10 border border-white/20 text-slate-200 text-[10px] font-black tracking-widest uppercase">Party Game Edition</span>
-                <h2 class="text-3xl font-black tracking-tight">Who Is The Imposter?</h2>
-                <p class="text-xs text-slate-400 max-w-xs mx-auto">Find out which member of your crew is hiding the secret identity!</p>
-            </div>
-
-            <div class="grid grid-cols-1 gap-4 pt-2">
-                <button onclick="selectGameMode('local')" class="beta-card p-6 rounded-3xl text-left space-y-2 hover:border-blue-500/50 active:scale-95 transition-all relative overflow-hidden group">
-                    <div class="flex items-center justify-between">
-                        <span class="text-lg font-black text-white group-hover:text-blue-400 transition-colors">📱 Pass-The-Phone</span>
-                        <span class="text-[10px] font-black px-3 py-1 rounded-full bg-blue-500/20 text-blue-400 border border-blue-400/30">1 Phone</span>
-                    </div>
-                    <p class="text-xs text-slate-400 leading-relaxed">Pass one device around the circle to secretly reveal roles and cast votes.</p>
-                </button>
-
-                <button onclick="selectGameMode('online')" class="beta-card p-6 rounded-3xl text-left space-y-2 hover:border-white/50 active:scale-95 transition-all relative overflow-hidden group">
-                    <div class="flex items-center justify-between">
-                        <span class="text-lg font-black text-white group-hover:text-slate-200 transition-colors">🌐 Online Party</span>
-                        <span class="text-[10px] font-black px-3 py-1 rounded-full bg-white/10 text-white border border-white/20">Multi-Device</span>
-                    </div>
-                    <p class="text-xs text-slate-400 leading-relaxed">Create or join a room code with up to 12 members on separate phones.</p>
-                </button>
-            </div>
-        </div>
-
-        <!-- SCREEN 0B: ONLINE LOBBY CHOICE -->
-        <div id="onlineLobbyChoiceScreen" class="hidden space-y-5 text-center">
-            <div class="space-y-1">
-                <h2 class="text-2xl font-black">Mafia Lobby</h2>
-                <p class="text-xs text-slate-400">Join a room or host your own session</p>
-            </div>
-
-            <div class="beta-card p-6 rounded-3xl space-y-4">
-                <div>
-                    <label class="block text-left text-xs font-black text-slate-400 mb-1.5 uppercase tracking-wider">Your Player Handle</label>
-                    <input type="text" id="myPlayerNameInput" placeholder="e.g. Alex, Sam..." maxlength="14" class="w-full px-4 py-3.5 rounded-2xl bg-white/5 border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 font-extrabold text-sm transition-all">
-                </div>
-
-                <div class="grid grid-cols-2 gap-3 pt-2">
-                    <button onclick="createOnlineRoom()" class="py-3.5 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white font-black text-sm shadow-lg shadow-blue-600/30 active:scale-95 transition-all">
-                        Create Lobby
-                    </button>
-                    <button onclick="showJoinRoomUI()" class="py-3.5 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 text-white font-black text-sm active:scale-95 transition-all">
-                        Join Room
-                    </button>
-                </div>
-
-                <!-- Join Code Box -->
-                <div id="joinCodeBox" class="hidden space-y-3 pt-3 border-t border-white/10">
-                    <input type="text" id="roomCodeInput" placeholder="4-LETTER CODE" maxlength="4" class="w-full px-4 py-3 rounded-2xl bg-white/5 border border-white/10 text-blue-400 uppercase tracking-widest text-center font-black text-2xl focus:outline-none focus:ring-2 focus:ring-blue-400">
-                    <button onclick="joinOnlineRoom()" class="w-full py-3.5 rounded-2xl bg-white text-slate-950 hover:bg-slate-200 font-black text-sm shadow-lg active:scale-95 transition-all">
-                        Connect Game
-                    </button>
-                </div>
-            </div>
-
-            <button onclick="switchScreen('modeSelectScreen')" class="text-xs font-bold text-slate-400 hover:text-white transition-colors">
-                ← Back to Mode Select
-            </button>
-        </div>
-
-        <!-- SCREEN 1: ROSTER SETUP -->
-        <div id="setupScreen" class="hidden space-y-5">
-            <div class="text-center space-y-1">
-                <h2 id="setupTitle" class="text-2xl font-black">Player Roster</h2>
-                <p id="setupSubtitle" class="text-xs text-slate-400">Add 5 to 12 players to compete</p>
-            </div>
-
-            <div id="localPlayerInputBox" class="beta-card p-4 rounded-3xl space-y-4">
-                <form onsubmit="handleAddPlayer(event)" class="flex gap-2">
-                    <input type="text" id="playerNameInput" placeholder="Player name..." maxlength="14" class="flex-1 px-4 py-3 rounded-2xl bg-white/5 border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm font-bold">
-                    <button type="submit" class="px-5 py-3 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white font-black text-sm shadow-md shadow-blue-600/30 active:scale-95 transition-all">
-                        Add
-                    </button>
-                </form>
-
-                <div id="setupFeedback" class="hidden text-xs text-blue-400 font-bold px-1"></div>
-
-                <!-- Squad Player Badges -->
-                <div class="space-y-2 max-h-52 overflow-y-auto custom-scrollbar pr-1" id="playerList">
-                    <!-- Populated via JavaScript -->
-                </div>
-
-                <div class="pt-2 border-t border-white/10 flex justify-between items-center text-xs text-slate-400 font-bold">
-                    <span>Total Players: <strong id="playerCount" class="text-blue-400">0</strong> / 12</span>
-                    <span>Mafia Imposters: <strong id="mafiaCount" class="text-white">0</strong></span>
-                </div>
-            </div>
-
-            <!-- Forfeits Toggle Option -->
-            <div class="beta-card p-4 rounded-2xl">
-                <label class="flex items-center gap-3 cursor-pointer select-none">
-                    <input type="checkbox" id="forfeitsCheckbox" class="w-5 h-5 rounded-lg bg-white/5 border-white/20 text-blue-600 focus:ring-blue-500" checked>
-                    <div>
-                        <span class="block text-sm font-black text-white">Mafia Penalty Forfeits</span>
-                        <span class="block text-[11px] text-slate-400">Voted out players must complete a fun penalty</span>
-                    </div>
-                </label>
-            </div>
-
-            <button id="startGameBtn" onclick="startGame()" disabled class="w-full py-4 rounded-2xl bg-blue-600 hover:bg-blue-500 disabled:opacity-30 disabled:cursor-not-allowed text-white font-black text-base shadow-xl shadow-blue-600/30 active:scale-98 transition-all">
-                Start Mafia Game
-            </button>
-        </div>
-
-        <!-- SCREEN 2: SECRET REVEAL PHASE -->
-        <div id="roleDistributionScreen" class="hidden space-y-6 text-center">
-            <div class="space-y-1">
-                <span class="px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 font-black text-[10px] uppercase tracking-widest">Confidential Identity</span>
-                <h2 id="roleScreenTitle" class="text-2xl font-black">Pass The Phone</h2>
-                <p id="roleScreenSubtitle" class="text-xs text-slate-400 max-w-xs mx-auto">Tap your card to secretly view your role.</p>
-            </div>
-
-            <div id="rolePlayerGrid" class="grid grid-cols-2 gap-3 max-h-72 overflow-y-auto custom-scrollbar p-1">
-                <!-- Dynamic Player Grid Cards -->
-            </div>
-
-            <!-- Modal for Confidential Reveal -->
-            <div id="roleRevealModal" class="hidden fixed inset-0 bg-slate-950/95 backdrop-blur-xl z-50 flex items-center justify-center p-4">
-                <div class="beta-card w-full max-w-xs p-6 rounded-3xl border border-white/10 text-center space-y-5 animate-pulse-glow">
-                    <div>
-                        <h3 id="modalPlayerName" class="text-xl font-black text-white">Player</h3>
-                        <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-0.5">Confidential Identity</p>
-                    </div>
-
-                    <div id="roleGraphicBox" class="py-6 px-4 rounded-2xl flex flex-col items-center justify-center gap-3 transition-all">
-                        <div id="roleIcon" class="w-16 h-16 flex items-center justify-center text-4xl"></div>
-                        <h4 id="roleTitle" class="text-2xl font-black tracking-wider uppercase">ROLE</h4>
-                    </div>
-
-                    <div id="mafiaTeammatesBox" class="hidden p-3 rounded-2xl bg-blue-500/10 border border-blue-400/20 text-xs text-left space-y-1">
-                        <span class="font-black text-blue-400 block">Fellow Mafia Imposters:</span>
-                        <div id="mafiaTeammatesList" class="text-slate-200 font-bold"></div>
-                    </div>
-
-                    <button onclick="hideRoleModal()" class="w-full py-3.5 rounded-2xl bg-white text-slate-950 font-black text-sm shadow-lg active:scale-95 transition-all">
-                        Hide & Keep Secret
-                    </button>
-                </div>
-            </div>
-
-            <button id="startDiscussionBtn" onclick="startDiscussionPhase()" disabled class="w-full py-4 rounded-2xl bg-white hover:bg-slate-200 disabled:opacity-30 text-slate-950 font-black text-base shadow-xl active:scale-98 transition-all">
-                Everyone Knows Role (Begin)
-            </button>
-        </div>
-
-        <!-- SCREEN 3: DISCUSSION & CHALLENGE PROMPTS -->
-        <div id="discussionScreen" class="hidden space-y-5">
-            <div class="flex justify-between items-center beta-card p-3.5 rounded-2xl">
-                <div class="flex items-center gap-2">
-                    <span class="w-3 h-3 rounded-full bg-blue-400 animate-ping"></span>
-                    <span class="text-xs font-black text-slate-200">Phase: Interrogation</span>
-                </div>
-                <div class="text-xs font-black">
-                    <span class="text-blue-400" id="discussionMafiaRemaining">0 Imposters</span> Active
-                </div>
-            </div>
-
-            <!-- Interrogation Card Prompt -->
-            <div class="beta-card p-6 rounded-3xl text-center space-y-4 border border-blue-500/30 relative overflow-hidden">
-                <div class="inline-flex p-3 rounded-2xl bg-blue-500/10 text-blue-400 border border-blue-500/20">
-                    <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 8 9 8z"></path></svg>
-                </div>
-                <h3 id="promptText" class="text-lg font-black text-white leading-snug">
-                    Loading Interrogation Question...
-                </h3>
-                <button id="newPromptBtn" onclick="generateNewPrompt()" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-blue-400 font-bold text-xs hover:bg-white/10 active:scale-95 transition-all">
-                    Next Challenge Question
-                </button>
-            </div>
-
-            <!-- Active Squad List -->
-            <div class="space-y-2">
-                <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest block px-1">Active Suspects</span>
-                <div id="alivePlayersList" class="flex flex-wrap gap-2">
-                    <!-- Badges via JS -->
-                </div>
-            </div>
-
-            <button id="startVotingBtn" onclick="startVotingPhase()" class="w-full py-4 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white font-black text-base shadow-xl shadow-blue-600/30 active:scale-98 transition-all">
-                Lock In Votes
-            </button>
-        </div>
-
-        <!-- SCREEN 4: SECRET BALLOT VOTING -->
-        <div id="votingScreen" class="hidden space-y-6 text-center">
-            <!-- Pass Phone Screen -->
-            <div id="votingPassPhoneState" class="space-y-6 py-6">
-                <div class="w-20 h-20 mx-auto rounded-3xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 text-3xl">
-                    🗳️
-                </div>
-                <div class="space-y-1">
-                    <p class="text-xs font-black text-slate-400 uppercase tracking-widest">Secret Elimination Ballot</p>
-                    <h2 class="text-2xl font-black">Pass Phone To</h2>
-                    <h3 id="nextVoterName" class="text-3xl font-black text-blue-400">Player</h3>
-                </div>
-                <button onclick="revealBallot()" class="w-full py-4 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white font-black text-base shadow-xl shadow-blue-600/30 active:scale-95 transition-all">
-                    I'm <span id="voterBtnName">Player</span>, Open Ballot
-                </button>
-            </div>
-
-            <!-- Active Voter Form -->
-            <div id="votingBallotState" class="hidden space-y-5 text-left">
-                <div class="text-center space-y-1">
-                    <span class="text-[10px] font-black text-blue-400 uppercase tracking-widest">Secret Ballot</span>
-                    <h3 class="text-2xl font-black text-white"><span id="activeVoterTitle">Player</span>'s Vote</h3>
-                    <p class="text-xs text-slate-400">Who do you suspect is the Imposter?</p>
-                </div>
-
-                <div id="ballotOptionsList" class="space-y-2.5 max-h-60 overflow-y-auto custom-scrollbar pr-1">
-                    <!-- Dynamic Radio Options -->
-                </div>
-
-                <button id="submitVoteBtn" onclick="submitVote()" disabled class="w-full py-4 rounded-2xl bg-blue-600 disabled:opacity-30 text-white font-black text-base shadow-xl shadow-blue-600/30 active:scale-98 transition-all">
-                    Confirm Vote
-                </button>
-            </div>
-
-            <!-- Online Mode Waiting Banner -->
-            <div id="onlineWaitingVotesBanner" class="hidden py-8 space-y-4">
-                <div class="w-14 h-14 mx-auto rounded-full border-4 border-blue-400 border-t-transparent animate-spin"></div>
-                <div class="space-y-1">
-                    <p class="text-base font-black text-white">Waiting for all votes...</p>
-                    <span id="voteProgressText" class="text-xs text-slate-400 block">0 / 0 votes submitted</span>
-                </div>
-            </div>
-        </div>
-
-        <!-- SCREEN 5: ROUND RESULT & FORFEIT -->
-        <div id="roundResultScreen" class="hidden space-y-5">
-            <div class="text-center space-y-1">
-                <span class="px-3 py-1 rounded-full bg-white/5 border border-white/10 text-slate-300 font-bold text-[10px] uppercase tracking-widest">Round Results</span>
-                <h2 class="text-2xl font-black">Voting Reveal</h2>
-            </div>
-
-            <div id="verdictCard" class="beta-card p-6 rounded-3xl text-center space-y-4 border border-white/10">
-                <div id="verdictBadge" class="w-16 h-16 mx-auto rounded-2xl flex items-center justify-center text-3xl"></div>
-                <div class="space-y-1">
-                    <h3 id="verdictTitle" class="text-2xl font-black text-white">Result</h3>
-                    <p id="verdictSubtitle" class="text-xs font-bold text-slate-400">Identity Status</p>
-                </div>
-
-                <!-- Mafia Forfeit Box -->
-                <div id="forfeitContainer" class="hidden p-4 rounded-2xl bg-blue-500/10 border border-blue-400/20 text-center space-y-1">
-                    <span class="text-[10px] font-black text-blue-400 uppercase tracking-widest flex items-center justify-center gap-1">
-                        ⚡ Mafia Penalty Challenge ⚡
-                    </span>
-                    <p id="forfeitText" class="text-xs font-extrabold text-slate-200 leading-relaxed"></p>
-                </div>
-            </div>
-
-            <!-- Votes Breakdown -->
-            <div class="beta-card p-4 rounded-2xl space-y-3">
-                <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Vote Breakdown</h4>
-                <div id="voteBreakdownList" class="space-y-2 max-h-40 overflow-y-auto custom-scrollbar text-xs font-bold">
-                    <!-- Populated via JS -->
-                </div>
-            </div>
-
-            <button id="nextRoundBtn" onclick="continueAfterRound()" class="w-full py-4 rounded-2xl bg-white hover:bg-slate-200 text-slate-950 font-black text-base shadow-xl active:scale-98 transition-all">
-                Next Interrogation
-            </button>
-        </div>
-
-        <!-- SCREEN 6: GAME OVER -->
-        <div id="gameOverScreen" class="hidden space-y-6 text-center">
-            <div id="victoryHeader" class="beta-card p-6 rounded-3xl space-y-4 border border-white/10">
-                <div id="victoryIcon" class="w-20 h-20 mx-auto rounded-3xl flex items-center justify-center text-5xl"></div>
-                <div class="space-y-1">
-                    <h2 id="victoryTitle" class="text-3xl font-black">CREW WINS!</h2>
-                    <p id="victorySubtitle" class="text-xs font-extrabold text-slate-400">All Mafia Imposters were caught!</p>
-                </div>
-            </div>
-
-            <div class="beta-card p-4 rounded-2xl space-y-3 text-left">
-                <h4 class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Full Roster Identity List</h4>
-                <div id="finalRosterList" class="space-y-2 max-h-48 overflow-y-auto custom-scrollbar">
-                    <!-- Populated via JS -->
-                </div>
-            </div>
-
-            <div class="grid grid-cols-2 gap-3">
-                <button onclick="resetGameSamePlayers()" class="py-4 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white font-black text-sm shadow-xl shadow-blue-600/30 active:scale-95 transition-all">
-                    Rematch
-                </button>
-                <button onclick="resetGameNewPlayers()" class="py-4 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 text-white font-black text-sm active:scale-95 transition-all">
-                    Main Menu
-                </button>
-            </div>
-        </div>
-
+    <!-- Dynamic Main Screen Container -->
+    <main id="screenContainer" class="flex flex-col items-center w-full min-h-[380px] justify-center">
+      <!-- Injected via JavaScript -->
     </main>
+  </div>
 
-    <footer class="w-full max-w-md mx-auto text-center text-[10px] font-black text-slate-500 uppercase tracking-widest">
-        Mafia • Imposter Edition Party Game
-    </footer>
-
-    <!-- Audio Effects Engine -->
-    <script>
-        class SoundEngine {
-            constructor() {
-                this.ctx = null;
-            }
-            init() {
-                if (!this.ctx) {
-                    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
-                }
-            }
-            playTone(freq, duration, type = 'sine') {
-                try {
-                    this.init();
-                    const osc = this.ctx.createOscillator();
-                    const gain = this.ctx.createGain();
-                    osc.type = type;
-                    osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
-                    gain.gain.setValueAtTime(0.1, this.ctx.currentTime);
-                    gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + duration);
-                    osc.connect(gain);
-                    gain.connect(this.ctx.destination);
-                    osc.start();
-                    osc.stop(this.ctx.currentTime + duration);
-                } catch(e) {}
-            }
-            click() { this.playTone(600, 0.08, 'triangle'); }
-            reveal() { this.playTone(400, 0.3, 'sine'); }
-            eliminate() { this.playTone(180, 0.5, 'sawtooth'); }
+  <!-- Audio Effects using Web Audio API -->
+  <script>
+    class SoundFX {
+      constructor() {
+        this.ctx = null;
+      }
+      init() {
+        if (!this.ctx) {
+          this.ctx = new (window.AudioContext || window.webkitAudioContext)();
         }
-        const sfx = new SoundEngine();
-    </script>
+      }
+      click() {
+        this.init();
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(600, this.ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(200, this.ctx.currentTime + 0.08);
+        gain.gain.setValueAtTime(0.3, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.08);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.08);
+      }
+      elim() {
+        this.init();
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(180, this.ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(40, this.ctx.currentTime + 0.5);
+        gain.gain.setValueAtTime(0.5, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.5);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.5);
+      }
+      gong() {
+        this.init();
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(110, this.ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(55, this.ctx.currentTime + 1.2);
+        gain.gain.setValueAtTime(0.6, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 1.2);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start();
+        osc.stop(this.ctx.currentTime + 1.2);
+      }
+    }
+    const sfx = new SoundFX();
 
-    <!-- Main Game Logic Engine -->
-    <script>
-        const PROMPT_TEMPLATES = [
-            "Who looks like they are hiding their true identity right now?",
-            "If everyone were stranded, who would be voted out first?",
-            "Who has the worst poker face in this room?",
-            "Look at the person to your left. Does their smile look suspicious?",
-            "Who took the longest to check their secret role earlier?",
-            "Who is trying too hard to stay quiet and blend in?",
-            "Who is acting defensive before anyone even accused them?",
-            "Look around the room. Who breaks eye contact first when you stare at them?",
-            "Who would break under pressure first during questioning?",
-            "Who is fidgeting or checking their phone more than usual?",
-            "Who is trying to direct everyone's suspicion onto another person?"
-        ];
-
-        const FORFEITS_BANK = [
-            "Must speak in an overly serious movie villain voice for the rest of the game!",
-            "Must keep both hands on top of your head until the next round ends.",
-            "Must act as the investigator and question the next voter dramatically.",
-            "Must stand up and make a dramatic villainous announcement!",
-            "Must whisper every sentence until a winner is declared.",
-            "Must compliment the person who voted you out 3 times in a row.",
-            "Must stay dead silent for the next 3 minutes."
-        ];
-
-        let gameMode = 'local';
-        let playerNames = [];
-        let players = [];
-        let currentVoterIndex = 0;
-        let votes = {};
-        let forfeitEnabled = true;
-
-        // Sync & Channel Engine (PeerJS + Firebase + Local Fallbacks)
-        let db = null;
-        let auth = null;
-        let roomCode = null;
-        let isHost = false;
-        let myPlayerId = null;
-        let roomUnsubscribe = null;
-        let networkChannel = null;
-        let peer = null;
-        let peerConnections = {};
-        let hostConn = null;
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'mafia-imposter-v1';
-
-        // PeerJS Setup for Cross-Device Support
-        function initPeerJS(code) {
-            cleanPeer();
-            const peerId = isHost ? `mafia-room-${code}` : `mafia-player-${code}-${Math.random().toString(36).substring(2, 7)}`;
-            
-            peer = new Peer(peerId, { debug: 1 });
-
-            peer.on('open', () => {
-                if (!isHost) {
-                    const hConn = peer.connect(`mafia-room-${code}`);
-                    setupClientConnection(hConn);
-                }
-            });
-
-            peer.on('connection', (conn) => {
-                if (isHost) {
-                    peerConnections[conn.peer] = conn;
-                    conn.on('data', (data) => handlePeerMessage(data, conn));
-                    conn.on('close', () => delete peerConnections[conn.peer]);
-                }
-            });
-
-            peer.on('error', (err) => {
-                console.warn("PeerJS connection note:", err.type);
-            });
+    // Voice Command Synthesis via Gemini TTS API
+    async function playVoiceCommand(promptText, voiceName = "Fenrir") {
+      try {
+        const apiKey = "";
+        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`;
+        const payload = {
+          contents: [{ parts: [{ text: promptText }] }],
+          generationConfig: {
+            responseModalities: ["AUDIO"],
+            speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voiceName } } }
+          },
+          model: "gemini-2.5-flash-preview-tts"
+        };
+        const res = await fetch(apiUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        const part = data?.candidates?.[0]?.content?.parts?.[0];
+        if (part && part.inlineData && part.inlineData.data) {
+          const mimeType = part.inlineData.mimeType || "audio/L16;rate=24000";
+          const match = mimeType.match(/rate=(\d+)/);
+          const sampleRate = match ? parseInt(match[1], 10) : 24000;
+          const pcmData = base64ToArrayBuffer(part.inlineData.data);
+          const pcm16 = new Int16Array(pcmData);
+          const wavBlob = pcmToWav(pcm16, sampleRate);
+          const audioUrl = URL.createObjectURL(wavBlob);
+          const audio = new Audio(audioUrl);
+          audio.play();
         }
+      } catch (err) {
+        console.warn("TTS Voice Command failed/skipped:", err);
+      }
+    }
 
-        function cleanPeer() {
-            if (peer) {
-                peer.destroy();
-                peer = null;
-            }
-            peerConnections = {};
-            hostConn = null;
+    function base64ToArrayBuffer(base64) {
+      const binaryString = atob(base64);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      return bytes.buffer;
+    }
+
+    function pcmToWav(pcm16, sampleRate) {
+      const numChannels = 1;
+      const byteRate = sampleRate * numChannels * 2;
+      const blockAlign = numChannels * 2;
+      const buffer = new ArrayBuffer(44 + pcm16.length * 2);
+      const view = new DataView(buffer);
+
+      function writeString(offset, string) {
+        for (let i = 0; i < string.length; i++) {
+          view.setUint8(offset + i, string.charCodeAt(i));
         }
+      }
 
-        function setupClientConnection(conn) {
-            hostConn = conn;
-            conn.on('open', () => {
-                const myName = document.getElementById('myPlayerNameInput').value.trim();
-                conn.send({ type: 'JOIN_REQUEST', name: myName });
-            });
-            conn.on('data', (data) => handlePeerMessage(data, conn));
+      writeString(0, 'RIFF');
+      view.setUint32(4, 36 + pcm16.length * 2, true);
+      writeString(8, 'WAVE');
+      writeString(12, 'fmt ');
+      view.setUint32(16, 16, true);
+      view.setUint16(20, 1, true);
+      view.setUint16(22, numChannels, true);
+      view.setUint32(24, sampleRate, true);
+      view.setUint32(28, byteRate, true);
+      view.setUint16(32, blockAlign, true);
+      view.setUint16(34, 16, true);
+      writeString(36, 'data');
+      view.setUint32(40, pcm16.length * 2, true);
+
+      let offset = 44;
+      for (let i = 0; i < pcm16.length; i++, offset += 2) {
+        view.setInt16(offset, pcm16[i], true);
+      }
+      return new Blob([buffer], { type: 'audio/wav' });
+    }
+  </script>
+
+  <!-- Game Logic and Visual State Machine -->
+  <script>
+    // Global State
+    let G = {
+      mode: 'murder_mystery', // 'murder_mystery' or 'mafia'
+      imposterCountMode: 'auto', // 'auto', 1, 2, 3
+      netMode: 'pass_phone', // 'pass_phone' or 'online'
+      roomCode: '',
+      isHost: true,
+      myPlayerId: '',
+      players: [],
+      phase: 'mode_select',
+      currentRevealIdx: 0,
+      showCardModal: false,
+      currentVoterIdx: 0,
+      votes: {}, // voterId -> targetId
+      discussionTimeLeft: 180, // 3 mins for Murder Mystery, 5 mins for Mafia
+      timerInterval: null,
+      nightTargetId: null,
+      lastKilledPlayer: null,
+      winner: null,
+      currentPrompt: ''
+    };
+
+    // Shufflable Interrogation Prompts Pools
+    const murderMysteryPrompts = [
+      "Who was acting overly quiet or evasive during the last few hours in the manor?",
+      "Who do you suspect most of wandering the halls alone last night?",
+      "If you had to inspect one person right now for hidden motives, who would it be?",
+      "Who is trying too hard to direct suspicion away from themselves?",
+      "Whose alibi or story about last night felt the most rehearsed or suspicious?"
+    ];
+
+    const mafiaPrompts = [
+      "Who was trying to dominate the conversation or defend someone too quickly?",
+      "Which player's voting pattern or reaction during the last cycle felt out of character?",
+      "If the person to your left turns out to be part of the mafia, would you be surprised?",
+      "Who is sitting quietly without contributing much to the town's deduction?",
+      "Who do you trust the absolute least in this town right now and why?"
+    ];
+
+    function getRandomPrompt() {
+      const pool = G.mode === 'murder_mystery' ? murderMysteryPrompts : mafiaPrompts;
+      const idx = Math.floor(Math.random() * pool.length);
+      return pool[idx];
+    }
+
+    // PeerJS Network Setup
+    let peer = null;
+    let peerConns = [];
+
+    function initPeer(customId = null) {
+      return new Promise((resolve) => {
+        try {
+          if (peer) { try { peer.destroy(); } catch(e) {} }
+          peer = customId ? new Peer(customId) : new Peer();
+          let resolved = false;
+          peer.on('open', (id) => { if (!resolved) { resolved = true; resolve(id); } });
+          peer.on('connection', (conn) => {
+            peerConns.push(conn);
+            conn.on('data', (data) => handleIncomingData(data));
+          });
+          peer.on('error', (err) => {
+            console.warn("PeerJS network warning:", err);
+            if (!resolved) { resolved = true; resolve(null); }
+          });
+          setTimeout(() => { if (!resolved) { resolved = true; resolve(null); } }, 3000);
+        } catch(e) {
+          console.error("PeerJS initialization error:", e);
+          resolve(null);
         }
+      });
+    }
 
-        function handlePeerMessage(data, conn) {
-            if (data.type === 'JOIN_REQUEST' && isHost) {
-                if (players.some(p => p.name.toLowerCase() === data.name.toLowerCase())) return;
-                const newId = players.length;
-                players.push({ id: newId, name: data.name, role: '', isAlive: true, seenRole: false });
-                playerNames = players.map(p => p.name);
-                broadcastState();
-            } else if (data.type === 'STATE_UPDATE') {
-                applyRoomState(data.state);
-            } else if (data.type === 'SUBMIT_VOTE' && isHost) {
-                votes[data.voterId] = data.targetId;
-                const aliveCount = players.filter(p => p.isAlive).length;
-                if (Object.keys(votes).length >= aliveCount) {
-                    const roundResult = processVotesTally(votes);
-                    players = roundResult.updatedPlayers;
-                    broadcastState('result', { roundResult });
-                } else {
-                    broadcastState('voting');
-                }
-            }
+    function broadcastState() {
+      if (!G.isHost) return;
+      peerConns.forEach(conn => {
+        if (conn && conn.open) conn.send({ type: 'STATE_UPDATE', state: G });
+      });
+      renderState();
+    }
+
+    function handleIncomingData(data) {
+      if (data.type === 'STATE_UPDATE') {
+        G = data.state;
+        renderState();
+      } else if (data.type === 'JOIN_REQUEST' && G.isHost) {
+        if (!G.players.find(p => p.id === data.player.id)) {
+          G.players.push(data.player);
+          broadcastState();
         }
+      } else if (data.type === 'CAST_VOTE' && G.isHost) {
+        G.votes[data.voterId] = data.targetId;
+        broadcastState();
+      }
+    }
 
-        // Local cross-tab BroadcastChannel for testing/same-domain multi-device
-        function initBroadcastChannel(code) {
-            if (networkChannel) networkChannel.close();
-            try {
-                networkChannel = new BroadcastChannel(`mafia_room_${code}`);
-                networkChannel.onmessage = (e) => handlePeerMessage(e.data, null);
-            } catch(err) {}
+    function generateCode() {
+      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+      let code = '';
+      for (let i = 0; i < 4; i++) code += chars.charAt(Math.floor(Math.random() * chars.length));
+      return code;
+    }
+
+    // Role Distribution Logic (Fisher-Yates Shuffle)
+    function shuffleArray(arr) {
+      const array = [...arr];
+      for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+      }
+      return array;
+    }
+
+    function assignRoles() {
+      const total = G.players.length;
+      let badCount = 1;
+      if (G.imposterCountMode === 'auto') {
+        if (total >= 6 && total <= 8) badCount = 2;
+        else if (total > 8) badCount = 3;
+      } else {
+        badCount = Math.min(parseInt(G.imposterCountMode, 10), Math.floor(total / 2));
+      }
+
+      let roles = [];
+      if (G.mode === 'murder_mystery') {
+        for (let i = 0; i < badCount; i++) roles.push('murderer');
+        roles.push('detective'); // 1 Detective in Murder Mystery
+        while (roles.length < total) roles.push('manor_guest');
+      } else {
+        for (let i = 0; i < badCount; i++) roles.push('mafia');
+        while (roles.length < total) roles.push('civilian');
+      }
+
+      roles = shuffleArray(roles);
+      G.players.forEach((p, idx) => {
+        p.role = roles[idx];
+        p.alive = true;
+      });
+    }
+
+    // UI RENDERERS FOR ALL SCREENS WITH MATCHING DESIGN
+    function renderState() {
+      const container = document.getElementById('screenContainer');
+      const badge = document.getElementById('gameModeBadge');
+      const title = document.getElementById('headerTitle');
+      const sub = document.getElementById('headerSubtitle');
+
+      badge.textContent = G.mode === 'murder_mystery' ? 'MURDER MYSTERY EDITION' : 'CLASSIC MAFIA EDITION';
+      title.textContent = G.mode === 'murder_mystery' ? 'Manor Murder Mystery' : 'Classic Mafia';
+      sub.textContent = G.mode === 'murder_mystery' ? 'Find the murderer before you are eliminated in the dark!' : 'Deduce the mafia members through town discussions and votes!';
+
+      switch (G.phase) {
+        case 'mode_select':
+          container.innerHTML = renderModeSelect();
+          break;
+        case 'lobby':
+          container.innerHTML = renderLobby();
+          break;
+        case 'reveal':
+          container.innerHTML = renderReveal();
+          break;
+        case 'discussion':
+          container.innerHTML = renderDiscussion();
+          break;
+        case 'night_approach':
+          container.innerHTML = renderNightApproach();
+          break;
+        case 'guests_close_eyes':
+          container.innerHTML = renderGuestsCloseEyes();
+          break;
+        case 'murderers_open_eyes':
+          container.innerHTML = renderMurderersOpenEyes();
+          break;
+        case 'morning_break':
+          container.innerHTML = renderMorningBreak();
+          break;
+        case 'vote_ballot':
+          container.innerHTML = renderVoteBallot();
+          break;
+        case 'vote_results':
+          container.innerHTML = renderVoteResults();
+          break;
+        case 'game_over':
+          container.innerHTML = renderGameOver();
+          break;
+      }
+    }
+
+    // --- SCREEN 1: MODE SELECT ---
+    function renderModeSelect() {
+      return `
+        <div class="flex flex-col items-center w-full space-y-4">
+          <!-- Murder Mystery Card -->
+          <button onclick="selectGameMode('murder_mystery')" class="w-full text-left p-5 rounded-2xl card-interactive flex items-center justify-between group">
+            <div class="space-y-1">
+              <div class="flex items-center gap-2">
+                <span class="text-xl">🏰</span>
+                <h3 class="text-xl font-bold text-white group-hover:text-blue-400 transition-colors">Murder Mystery</h3>
+              </div>
+              <p class="text-xs text-slate-400 max-w-xs leading-relaxed">
+                Roles: Murderer, Detective, Manor Guest. Features 3-min discussion, night kills, and ballot votes.
+              </p>
+            </div>
+            <span class="px-3.5 py-1.5 bg-indigo-600/90 text-white text-xs font-semibold rounded-full shadow-md whitespace-nowrap">
+              Mystery
+            </span>
+          </button>
+
+          <!-- Classic Mafia Card -->
+          <button onclick="selectGameMode('mafia')" class="w-full text-left p-5 rounded-2xl card-interactive flex items-center justify-between group">
+            <div class="space-y-1">
+              <div class="flex items-center gap-2">
+                <span class="text-xl">🕵️</span>
+                <h3 class="text-xl font-bold text-white group-hover:text-blue-400 transition-colors">Classic Mafia</h3>
+              </div>
+              <p class="text-xs text-slate-400 max-w-xs leading-relaxed">
+                Roles: Mafia and Civilian. Features continuous 5-minute discussion timers alternating with voting ballots.
+              </p>
+            </div>
+            <span class="px-3.5 py-1.5 bg-slate-800 border border-slate-600/80 text-slate-300 text-xs font-semibold rounded-full whitespace-nowrap">
+              Classic
+            </span>
+          </button>
+
+          <!-- Net Mode Toggle -->
+          <div class="flex items-center justify-between w-full px-2 pt-2 border-t border-slate-800/80 mt-2">
+            <span class="text-xs text-slate-400 font-semibold">Networking Style:</span>
+            <div class="flex gap-2">
+              <button onclick="setNetMode('pass_phone')" class="px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${G.netMode === 'pass_phone' ? 'bg-blue-600 border-blue-400 text-white' : 'bg-slate-900 border-slate-700 text-slate-400'}">Pass-The-Phone</button>
+              <button onclick="setNetMode('online')" class="px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${G.netMode === 'online' ? 'bg-blue-600 border-blue-400 text-white' : 'bg-slate-900 border-slate-700 text-slate-400'}">Online Party</button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function selectGameMode(mode) {
+      sfx.click();
+      G.mode = mode;
+      G.discussionTimeLeft = mode === 'murder_mystery' ? 180 : 300; // 3 mins vs 5 mins
+      G.phase = 'lobby';
+      renderState();
+    }
+
+    function setNetMode(net) {
+      sfx.click();
+      G.netMode = net;
+      renderState();
+    }
+
+    // --- SCREEN 2: LOBBY ---
+    function renderLobby() {
+      const isMM = G.mode === 'murder_mystery';
+
+      const settingsHTML = `
+        <div class="w-full bg-slate-950/60 border border-slate-800 rounded-2xl p-4 space-y-4">
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <label class="text-xs font-bold text-slate-300 uppercase tracking-wider block">${isMM ? 'Murderer' : 'Mafia'} Count</label>
+              <span class="text-[10px] text-slate-400 font-medium">Auto scales with player count</span>
+            </div>
+            <div class="grid grid-cols-4 gap-2">
+              ${['auto', 1, 2, 3].map(c => `
+                <button onclick="setImposterCount('${c}')" class="py-2 px-2 rounded-xl border font-bold text-xs transition-all ${String(G.imposterCountMode) === String(c) ? 'bg-blue-600 border-blue-400 text-white shadow-md' : 'bg-slate-900 border-slate-700 text-slate-400 hover:text-white'}">
+                  ${c === 'auto' ? 'Auto' : c}
+                </button>
+              `).join('')}
+            </div>
+          </div>
+        </div>
+      `;
+
+      if (G.netMode === 'pass_phone') {
+        return `
+          <div class="flex flex-col items-center w-full space-y-4">
+            ${settingsHTML}
+
+            <div class="w-full space-y-2 text-left">
+              <label class="text-xs font-bold text-slate-300 uppercase tracking-wider block">Add Players</label>
+              <div class="flex gap-2 w-full">
+                <input type="text" id="playerNameInput" placeholder="Enter player name..." class="flex-1 bg-slate-900/80 border border-slate-700/80 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-500 text-white placeholder-slate-500">
+                <button onclick="addPassPlayer()" class="bg-blue-600 hover:bg-blue-500 text-white font-bold px-6 py-3 rounded-xl transition-all shadow-md">
+                  Add
+                </button>
+              </div>
+            </div>
+
+            <!-- Player List -->
+            <div class="w-full bg-slate-950/40 border border-slate-800 rounded-2xl p-4 max-h-40 overflow-y-auto space-y-2">
+              ${G.players.length === 0 ? `<div class="text-xs text-center text-slate-500 py-4">No players added yet. Add at least 3 players.</div>` : ''}
+              ${G.players.map((p, i) => `
+                <div class="flex items-center justify-between bg-slate-900/90 border border-slate-800 rounded-xl px-4 py-2.5 text-sm">
+                  <span class="font-semibold text-slate-200">${i+1}. ${p.name}</span>
+                  <button onclick="removePlayer(${i})" class="text-red-400 hover:text-red-300 text-xs font-bold px-2 py-1">Remove</button>
+                </div>
+              `).join('')}
+            </div>
+
+            <div class="flex gap-3 w-full pt-2">
+              <button onclick="G.phase='mode_select'; renderState();" class="w-1/3 py-3.5 bg-slate-800/80 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-sm transition-all">
+                Back
+              </button>
+              <button onclick="startGame()" ${G.players.length < 3 ? 'disabled class="w-2/3 py-3.5 bg-slate-800 text-slate-500 font-bold rounded-xl text-sm cursor-not-allowed"' : 'class="w-2/3 py-3.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-sm shadow-lg glow-blue transition-all"'}>
+                Start Game (${G.players.length})
+              </button>
+            </div>
+          </div>
+        `;
+      } else {
+        return `
+          <div class="flex flex-col items-center w-full space-y-4">
+            ${G.isHost ? settingsHTML : ''}
+
+            ${G.roomCode ? `
+              <div class="bg-slate-950/80 border border-indigo-500/40 p-3.5 rounded-2xl text-center w-full">
+                <span class="text-xs text-slate-400 uppercase tracking-widest block mb-0.5">Room Code</span>
+                <span class="text-3xl font-extrabold text-indigo-400 tracking-widest">${G.roomCode}</span>
+              </div>
+            ` : `
+              <div class="w-full space-y-3">
+                <input type="text" id="handleInput" placeholder="Your Handle..." class="w-full bg-slate-900/80 border border-slate-700/80 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-500 text-white">
+                <div class="grid grid-cols-2 gap-3">
+                  <button onclick="createOnlineRoom()" class="py-3.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-sm transition-all">Create Room</button>
+                  <button onclick="joinOnlineRoomPrompt()" class="py-3.5 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl text-sm transition-all">Join Room</button>
+                </div>
+              </div>
+            `}
+
+            <!-- Player List -->
+            <div class="w-full bg-slate-950/40 border border-slate-800 rounded-2xl p-4 max-h-40 overflow-y-auto space-y-2">
+              <span class="text-xs text-slate-400 font-bold uppercase tracking-wider block mb-2">Connected Players</span>
+              ${G.players.map(p => `
+                <div class="flex items-center justify-between bg-slate-900/90 border border-slate-800 rounded-xl px-4 py-2 text-sm">
+                  <span class="font-semibold text-slate-200">${p.name} ${p.id === G.myPlayerId ? '(You)' : ''}</span>
+                  ${p.id === G.myPlayerId ? '<span class="text-xs bg-indigo-950 text-indigo-400 border border-indigo-800 px-2 py-0.5 rounded-full font-bold">HOST</span>' : ''}
+                </div>
+              `).join('')}
+            </div>
+
+            ${G.isHost && G.roomCode ? `
+              <button onclick="startGame()" ${G.players.length < 3 ? 'disabled class="w-full py-3.5 bg-slate-800 text-slate-500 font-bold rounded-xl text-sm cursor-not-allowed"' : 'class="w-full py-3.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-sm shadow-lg glow-blue transition-all"'}>
+                Start Multi-Device Game
+              </button>
+            ` : ''}
+
+            <button onclick="G.phase='mode_select'; renderState();" class="text-xs text-slate-400 hover:text-white transition-colors pt-1">
+              &larr; Back to Main Screen
+            </button>
+          </div>
+        `;
+      }
+    }
+
+    function addPassPlayer() {
+      const input = document.getElementById('playerNameInput');
+      if (!input || !input.value.trim()) return;
+      sfx.click();
+      G.players.push({
+        id: 'p_' + Math.random().toString(36).substr(2, 9),
+        name: input.value.trim(),
+        role: '',
+        alive: true
+      });
+      input.value = '';
+      renderState();
+    }
+
+    function removePlayer(idx) {
+      sfx.click();
+      G.players.splice(idx, 1);
+      renderState();
+    }
+
+    async function createOnlineRoom() {
+      const handleInput = document.getElementById('handleInput');
+      const name = handleInput && handleInput.value.trim() ? handleInput.value.trim() : 'Host Player';
+      sfx.click();
+      G.roomCode = generateCode();
+      G.myPlayerId = 'p_' + Math.random().toString(36).substr(2, 9);
+      G.isHost = true;
+      G.players = [{ id: G.myPlayerId, name: name, role: '', alive: true }];
+
+      await initPeer('imposter_room_' + G.roomCode);
+      renderState();
+    }
+
+    async function joinOnlineRoomPrompt() {
+      const code = prompt("Enter 4-letter Room Code:");
+      if (!code) return;
+      const handleInput = document.getElementById('handleInput');
+      const name = handleInput && handleInput.value.trim() ? handleInput.value.trim() : 'Player';
+      sfx.click();
+
+      G.roomCode = code.toUpperCase();
+      G.myPlayerId = 'p_' + Math.random().toString(36).substr(2, 9);
+      G.isHost = false;
+
+      const myId = await initPeer();
+      const hostPeerId = 'imposter_room_' + G.roomCode;
+      const conn = peer.connect(hostPeerId);
+
+      conn.on('open', () => {
+        conn.send({
+          type: 'JOIN_REQUEST',
+          player: { id: G.myPlayerId, name: name, role: '', alive: true }
+        });
+      });
+
+      conn.on('data', (data) => handleIncomingData(data));
+      renderState();
+    }
+
+    function setImposterCount(count) {
+      sfx.click();
+      G.imposterCountMode = count;
+      if (G.netMode === 'online') broadcastState();
+      else renderState();
+    }
+
+    function startGame() {
+      if (G.players.length < 3) return;
+      sfx.gong();
+      assignRoles();
+      G.currentRevealIdx = 0;
+      G.showCardModal = false;
+      G.phase = 'reveal';
+      if (G.netMode === 'online') broadcastState();
+      else renderState();
+    }
+
+    // --- SCREEN 3: ROLE REVEAL ---
+    function renderReveal() {
+      const p = G.players[G.currentRevealIdx];
+      const isMM = G.mode === 'murder_mystery';
+
+      let roleTitle = '';
+      let roleDesc = '';
+      let isBad = false;
+
+      if (isMM) {
+        if (p.role === 'murderer') {
+          roleTitle = 'MURDERER';
+          roleDesc = 'Eliminate all manor guests in secret without getting caught!';
+          isBad = true;
+        } else if (p.role === 'detective') {
+          roleTitle = 'DETECTIVE';
+          roleDesc = 'Investigate suspicious activity and lead the crew to truth!';
+        } else {
+          roleTitle = 'MANOR GUEST';
+          roleDesc = 'Deduce who the murderer is and survive the nights!';
         }
-
-        function broadcastState(overrideStatus = null, extraProps = {}) {
-            const currentStatus = overrideStatus || window.currentRoomStatus || 'setup';
-            window.currentRoomStatus = currentStatus;
-            const state = {
-                status: currentStatus,
-                players: players,
-                forfeitEnabled: forfeitEnabled,
-                currentPrompt: window.currentPrompt || '',
-                votes: votes,
-                ...extraProps
-            };
-
-            // 1. Broadcast over PeerJS WebRTC connections
-            Object.values(peerConnections).forEach(conn => {
-                if (conn && conn.open) {
-                    conn.send({ type: 'STATE_UPDATE', state });
-                }
-            });
-
-            // 2. Broadcast over local browser channel
-            if (networkChannel) {
-                networkChannel.postMessage({ type: 'STATE_UPDATE', state });
-            }
-
-            // 3. Sync to cloud database if available
-            if (db && roomCode) {
-                try {
-                    const { doc, setDoc } = window.firebaseImports;
-                    const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomCode);
-                    setDoc(roomRef, state, { merge: true });
-                } catch (e) {}
-            }
-            applyRoomState(state);
+      } else {
+        if (p.role === 'mafia') {
+          roleTitle = 'MAFIA';
+          roleDesc = 'Blend in with civilians and eliminate them during voting!';
+          isBad = true;
+        } else {
+          roleTitle = 'CIVILIAN';
+          roleDesc = 'Find and vote out the mafia members before they outnumber you!';
         }
+      }
 
-        function applyRoomState(roomData) {
-            players = roomData.players || [];
-            playerNames = players.map(p => p.name);
-            forfeitEnabled = roomData.forfeitEnabled;
-            votes = roomData.votes || {};
-            window.currentRoomStatus = roomData.status;
+      const partners = G.players
+        .filter(x => x.id !== p.id && (x.role === 'murderer' || x.role === 'mafia'))
+        .map(x => x.name);
 
-            if (myPlayerId !== null && players[myPlayerId]) {
-                const match = players.find(p => p.name.toLowerCase() === players[myPlayerId].name.toLowerCase());
-                if (match) myPlayerId = match.id;
-            }
+      return `
+        <div class="flex flex-col items-center text-center space-y-6 w-full">
+          <div class="w-full bg-slate-950/60 border border-slate-800 rounded-3xl p-6 flex flex-col items-center">
+            <div class="w-16 h-16 rounded-full bg-blue-950/50 border border-blue-500/30 flex items-center justify-center mb-3 text-blue-400">
+              <svg class="w-8 h-8" viewBox="0 0 100 100" fill="none" stroke="currentColor">
+                <rect x="20" y="30" width="60" height="40" rx="4" stroke-width="2.5"/>
+                <path d="M20 30 L50 52 L80 30" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+            <span class="text-xs text-slate-400 uppercase tracking-widest font-bold">PASS PHONE TO</span>
+            <h2 class="text-3xl font-extrabold text-white mt-1">${p.name}</h2>
+          </div>
 
-            renderSetupPlayerList();
-            syncOnlineUI(roomData);
+          ${!G.showCardModal ? `
+            <button onclick="G.showCardModal=true; sfx.click(); renderState();" class="w-full py-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-extrabold text-base rounded-2xl shadow-xl hover:opacity-95 transition-all glow-blue">
+              VIEW SECRET ROLE CARD
+            </button>
+          ` : `
+            <div class="w-full bg-slate-950/80 border ${isBad ? 'border-red-500/50' : 'border-emerald-500/50'} rounded-3xl p-6 flex flex-col items-center animate-pulse-slow">
+              <span class="text-xs font-bold uppercase tracking-widest text-slate-400 mb-1">YOUR SECRET ROLE</span>
+              <h3 class="text-3xl font-black ${isBad ? 'text-red-400' : 'text-emerald-400'} mb-2">
+                ${roleTitle}
+              </h3>
+              <p class="text-xs text-slate-300 max-w-xs mb-4 leading-relaxed">${roleDesc}</p>
+
+              ${isBad ? `
+                <div class="w-full bg-slate-900/90 border border-red-900/40 rounded-xl p-3 mb-4">
+                  <span class="text-xs text-red-400 font-bold block">FELLOW PARTNERS:</span>
+                  <span class="text-sm font-semibold text-white">
+                    ${partners.length > 0 ? partners.join(', ') : 'None (Working alone)'}
+                  </span>
+                </div>
+              ` : ''}
+
+              <button onclick="nextReveal()" class="w-full py-3 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl text-sm transition-all">
+                Hide Card & Pass Phone
+              </button>
+            </div>
+          `}
+        </div>
+      `;
+    }
+
+    function nextReveal() {
+      sfx.click();
+      G.showCardModal = false;
+      if (G.currentRevealIdx + 1 < G.players.length) {
+        G.currentRevealIdx++;
+        renderState();
+      } else {
+        startDiscussion();
+      }
+    }
+
+    // --- SCREEN 4: DISCUSSION ---
+    function startDiscussion() {
+      G.phase = 'discussion';
+      G.discussionTimeLeft = G.mode === 'murder_mystery' ? 180 : 300; // 3 min MM, 5 min Mafia
+      G.currentPrompt = getRandomPrompt();
+      if (G.netMode === 'online') broadcastState();
+      else renderState();
+
+      startDiscussionTimer();
+    }
+
+    function startDiscussionTimer() {
+      if (G.timerInterval) clearInterval(G.timerInterval);
+      G.timerInterval = setInterval(() => {
+        if (G.discussionTimeLeft > 0) {
+          G.discussionTimeLeft--;
+          renderTimerDisplay();
+        } else {
+          clearInterval(G.timerInterval);
+          handleDiscussionEnd();
         }
+      }, 1000);
+    }
 
-        function selectGameMode(mode) {
-            sfx.click();
-            gameMode = mode;
-            if (mode === 'local') {
-                cleanPeer();
-                document.getElementById('roomBadge').classList.add('hidden');
-                document.getElementById('localPlayerInputBox').classList.remove('hidden');
-                document.getElementById('setupTitle').textContent = 'Player Roster';
-                document.getElementById('setupSubtitle').textContent = 'Add 5 to 12 players to compete';
-                switchScreen('setupScreen');
-                renderSetupPlayerList();
-            } else {
-                initFirebase();
-                switchScreen('onlineLobbyChoiceScreen');
-            }
+    function renderTimerDisplay() {
+      const el = document.getElementById('timerMinutes');
+      if (!el) return;
+      const m = Math.floor(G.discussionTimeLeft / 60);
+      const s = G.discussionTimeLeft % 60;
+      el.textContent = `${m}:${s < 10 ? '0' : ''}${s}`;
+    }
+
+    function renderDiscussion() {
+      const m = Math.floor(G.discussionTimeLeft / 60);
+      const s = G.discussionTimeLeft % 60;
+
+      return `
+        <div class="flex flex-col items-center text-center space-y-6 w-full">
+          <div class="relative w-24 h-24 rounded-full bg-slate-950 border-2 border-indigo-500/50 flex flex-col items-center justify-center glow-indigo">
+            <span id="timerMinutes" class="text-2xl font-black text-indigo-400 tracking-wider">${m}:${s < 10 ? '0' : ''}${s}</span>
+          </div>
+
+          <div>
+            <h2 class="text-2xl font-black text-white">${G.mode === 'murder_mystery' ? 'MANOR INTERROGATION' : 'TOWN DISCUSSION'}</h2>
+            <p class="text-xs text-slate-400 mt-1 max-w-sm">Discuss suspicions and formulate arguments before the phase ends.</p>
+          </div>
+
+          <!-- Dynamic Interrogation Prompt Card with Shuffle Button -->
+          <div class="w-full bg-indigo-950/40 border border-indigo-500/30 rounded-2xl p-4 text-left space-y-1">
+            <div class="flex items-center justify-between">
+              <span class="text-[10px] text-indigo-400 font-bold uppercase tracking-wider">Interrogation Prompt</span>
+              <button onclick="shufflePrompt()" class="text-[10px] text-indigo-300 hover:text-white underline font-semibold">Shuffle Prompt</button>
+            </div>
+            <p id="interrogationPromptText" class="text-sm font-bold text-white">${G.currentPrompt}</p>
+          </div>
+
+          <div class="w-full bg-slate-950/40 border border-slate-800 rounded-2xl p-4 max-h-36 overflow-y-auto space-y-2">
+            <span class="text-xs text-slate-400 font-bold uppercase tracking-wider block mb-1">Surviving Crew</span>
+            <div class="grid grid-cols-2 gap-2">
+              ${G.players.map(p => `
+                <div class="flex items-center gap-2 p-2 rounded-xl ${p.alive ? 'bg-slate-900 border border-slate-800 text-slate-200' : 'bg-red-950/30 border border-red-900/40 text-red-500/60 line-through'} text-xs font-semibold">
+                  <div class="w-2 h-2 rounded-full ${p.alive ? 'bg-emerald-400' : 'bg-red-500'}"></div>
+                  <span>${p.name}</span>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+
+          <button onclick="skipDiscussionTimer()" class="w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold text-sm rounded-xl transition-all shadow-lg glow-indigo">
+            END DISCUSSION EARLY &rarr;
+          </button>
+        </div>
+      `;
+    }
+
+    function shufflePrompt() {
+      sfx.click();
+      G.currentPrompt = getRandomPrompt();
+      const el = document.getElementById('interrogationPromptText');
+      if (el) el.textContent = G.currentPrompt;
+      if (G.netMode === 'online') broadcastState();
+    }
+
+    function skipDiscussionTimer() {
+      sfx.click();
+      if (G.timerInterval) clearInterval(G.timerInterval);
+      handleDiscussionEnd();
+    }
+
+    function handleDiscussionEnd() {
+      if (G.mode === 'murder_mystery') {
+        goNightApproach();
+      } else {
+        goVoteBallot();
+      }
+    }
+
+    // --- MURDER MYSTERY NIGHT PHASES ---
+    function goNightApproach() {
+      G.phase = 'night_approach';
+      if (G.netMode === 'online') broadcastState();
+      else renderState();
+      sfx.elim();
+      playVoiceCommand("Night is approaching. One manor guest will be killed. Guests, close your eyes!", "Fenrir");
+    }
+
+    function renderNightApproach() {
+      return `
+        <div class="flex flex-col items-center text-center space-y-6 w-full animate-pulse-slow">
+          <div class="w-24 h-24 rounded-full bg-slate-950 border-2 border-red-500/60 flex items-center justify-center text-red-400 shadow-xl">
+            <span class="text-4xl">🌙</span>
+          </div>
+
+          <div>
+            <h2 class="text-3xl font-black text-red-400">NIGHT IS APPROACHING</h2>
+            <p class="text-sm text-slate-300 mt-2 max-w-sm">One manor guest will be eliminated in the dark.</p>
+          </div>
+
+          <div class="bg-red-950/40 border border-red-800/40 p-4 rounded-2xl w-full">
+            <span class="text-xs text-red-300 font-bold tracking-wider uppercase">ANNOUNCEMENT</span>
+            <p class="text-slate-200 text-sm mt-1 font-semibold">"Guests, close your eyes!"</p>
+          </div>
+
+          <button onclick="goGuestsCloseEyes()" class="w-full py-4 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl text-sm transition-all">
+            Continue &rarr;
+          </button>
+        </div>
+      `;
+    }
+
+    function goGuestsCloseEyes() {
+      G.phase = 'guests_close_eyes';
+      if (G.netMode === 'online') broadcastState();
+      else renderState();
+      sfx.click();
+    }
+
+    function renderGuestsCloseEyes() {
+      return `
+        <div class="flex flex-col items-center text-center space-y-6 w-full">
+          <div class="w-24 h-24 rounded-full bg-slate-950 border border-slate-800 flex items-center justify-center text-slate-400">
+            <span class="text-4xl">🙈</span>
+          </div>
+
+          <div>
+            <h2 class="text-2xl font-black text-slate-300">ALL GUESTS CLOSE YOUR EYES</h2>
+            <p class="text-xs text-slate-400 mt-1">Ensure everyone has closed their eyes and covered their ears.</p>
+          </div>
+
+          <button onclick="goMurderersOpenEyes()" class="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-sm rounded-xl transition-all shadow-lg glow-blue">
+            MURDERERS OPEN EYES &rarr;
+          </button>
+        </div>
+      `;
+    }
+
+    function goMurderersOpenEyes() {
+      G.phase = 'murderers_open_eyes';
+      G.nightTargetId = null;
+      if (G.netMode === 'online') broadcastState();
+      else renderState();
+      sfx.click();
+      playVoiceCommand("Murderers, open your eyes. Select your victim in secret.", "Kore");
+    }
+
+    function renderMurderersOpenEyes() {
+      const livingGuests = G.players.filter(p => p.alive && p.role !== 'murderer');
+
+      return `
+        <div class="flex flex-col items-center text-center space-y-6 w-full">
+          <div>
+            <h2 class="text-2xl font-black text-red-400">MURDERERS, OPEN YOUR EYES</h2>
+            <p class="text-xs text-slate-400 mt-1">Secretly choose one innocent manor guest to eliminate tonight.</p>
+          </div>
+
+          <div class="w-full space-y-2 max-h-56 overflow-y-auto">
+            ${livingGuests.map(p => `
+              <button onclick="selectNightTarget('${p.id}')" class="w-full p-4 ${G.nightTargetId === p.id ? 'bg-red-600 border-red-400 text-white' : 'bg-slate-900 hover:bg-slate-800 border-slate-700 text-slate-200'} border rounded-2xl flex items-center justify-between font-bold text-sm transition-all">
+                <span>${p.name}</span>
+                ${G.nightTargetId === p.id ? '<span class="text-xs uppercase tracking-widest bg-black/40 px-2.5 py-1 rounded-full">Targeted</span>' : ''}
+              </button>
+            `).join('')}
+          </div>
+
+          <button onclick="confirmNightKill()" ${!G.nightTargetId ? 'disabled class="w-full py-4 bg-slate-800 text-slate-500 font-bold rounded-xl text-sm cursor-not-allowed"' : 'class="w-full py-4 bg-red-600 hover:bg-red-500 text-white font-extrabold text-sm rounded-xl shadow-lg glow-blue transition-all"'}>
+            CONFIRM KILL STRIKE
+          </button>
+        </div>
+      `;
+    }
+
+    function selectNightTarget(targetId) {
+      sfx.click();
+      G.nightTargetId = targetId;
+      renderState();
+    }
+
+    function confirmNightKill() {
+      if (!G.nightTargetId) return;
+      sfx.elim();
+
+      const victim = G.players.find(p => p.id === G.nightTargetId);
+      if (victim) {
+        victim.alive = false;
+        G.lastKilledPlayer = victim;
+      }
+
+      if (checkWinConditions()) return;
+
+      G.phase = 'morning_break';
+      if (G.netMode === 'online') broadcastState();
+      else renderState();
+    }
+
+    function renderMorningBreak() {
+      return `
+        <div class="flex flex-col items-center text-center space-y-6 w-full">
+          <div>
+            <h2 class="text-3xl font-black text-amber-400">MORNING BREAKS</h2>
+            <p class="text-xs text-slate-400 mt-1">Everyone open your eyes!</p>
+          </div>
+
+          <div class="w-full bg-red-950/40 border border-red-800/60 p-5 rounded-2xl flex flex-col items-center">
+            <span class="text-xs text-red-400 font-bold tracking-widest uppercase mb-1">TRAGEDY AT NIGHT</span>
+            <span class="text-2xl font-black text-white">${G.lastKilledPlayer ? G.lastKilledPlayer.name : 'No one'}</span>
+            <span class="text-xs text-red-300/80 mt-1">was found dead in the manor!</span>
+          </div>
+
+          <button onclick="goVoteBallot()" class="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-sm rounded-xl transition-all shadow-lg glow-blue">
+            PROCEED TO VOTE BALLOT &rarr;
+          </button>
+        </div>
+      `;
+    }
+
+    // --- VOTE BALLOT (Shared for Murder Mystery & Mafia) ---
+    function goVoteBallot() {
+      G.phase = 'vote_ballot';
+      G.currentVoterIdx = 0;
+      G.votes = {};
+      if (G.netMode === 'online') broadcastState();
+      else renderState();
+      sfx.gong();
+    }
+
+    function renderVoteBallot() {
+      const livingPlayers = G.players.filter(p => p.alive);
+      const currentVoter = livingPlayers[G.currentVoterIdx];
+
+      if (!currentVoter) {
+        tallyVotesAndEliminate();
+        return '';
+      }
+
+      return `
+        <div class="flex flex-col items-center text-center space-y-6 w-full">
+          <div>
+            <div class="inline-block px-3.5 py-1 bg-indigo-950 border border-indigo-500/40 text-indigo-300 text-xs font-bold uppercase rounded-full mb-2">
+              VOTE BALLOT (${G.currentVoterIdx + 1}/${livingPlayers.length})
+            </div>
+            <h2 class="text-2xl font-black text-white">${currentVoter.name}'S SECRET VOTE</h2>
+            <p class="text-xs text-slate-400 mt-1">Select one suspect to cast your vote for elimination.</p>
+          </div>
+
+          <div class="w-full space-y-2 max-h-52 overflow-y-auto">
+            ${livingPlayers.filter(p => p.id !== currentVoter.id).map(p => `
+              <button onclick="castBallot('${currentVoter.id}', '${p.id}')" class="w-full p-3.5 bg-slate-900 hover:bg-slate-800 border border-slate-700/80 rounded-xl flex items-center justify-between font-bold text-sm text-slate-200 transition-all">
+                <span>${p.name}</span>
+                <span class="text-xs text-blue-400">Vote &rarr;</span>
+              </button>
+            `).join('')}
+          </div>
+        </div>
+      `;
+    }
+
+    function castBallot(voterId, targetId) {
+      sfx.click();
+      G.votes[voterId] = targetId;
+
+      const livingPlayers = G.players.filter(p => p.alive);
+      if (G.currentVoterIdx + 1 < livingPlayers.length) {
+        G.currentVoterIdx++;
+        renderState();
+      } else {
+        tallyVotesAndEliminate();
+      }
+    }
+
+    function tallyVotesAndEliminate() {
+      const counts = {};
+      Object.values(G.votes).forEach(tId => {
+        counts[tId] = (counts[tId] || 0) + 1;
+      });
+
+      let maxVotes = 0;
+      let eliminatedId = null;
+      let isTie = false;
+
+      Object.entries(counts).forEach(([tId, count]) => {
+        if (count > maxVotes) {
+          maxVotes = count;
+          eliminatedId = tId;
+          isTie = false;
+        } else if (count === maxVotes) {
+          isTie = true;
         }
+      });
 
-        function showJoinRoomUI() {
-            sfx.click();
-            document.getElementById('joinCodeBox').classList.remove('hidden');
+      if (!isTie && eliminatedId) {
+        const p = G.players.find(x => x.id === eliminatedId);
+        if (p) {
+          p.alive = false;
+          G.lastKilledPlayer = p;
         }
-
-        async function initFirebase() {
-            if (db) return;
-            try {
-                const firebaseConfig = typeof __firebase_config !== 'undefined' 
-                    ? JSON.parse(__firebase_config) 
-                    : { apiKey: "demo", authDomain: "demo.firebaseapp.com", projectId: "demo" };
-
-                const { initializeApp, getAuth, signInAnonymously, getFirestore } = window.firebaseImports;
-                const app = initializeApp(firebaseConfig);
-                auth = getAuth(app);
-                db = getFirestore(app);
-                await signInAnonymously(auth);
-            } catch (err) {
-                console.warn("Firebase initialized fallback");
-            }
-        }
-
-        function generateRoomCode() {
-            const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
-            let code = '';
-            for (let i = 0; i < 4; i++) code += chars.charAt(Math.floor(Math.random() * chars.length));
-            return code;
-        }
-
-        async function createOnlineRoom() {
-            sfx.click();
-            const nameInput = document.getElementById('myPlayerNameInput').value.trim();
-            if (!nameInput) {
-                alert('Please enter your player handle!');
-                return;
-            }
-
-            await initFirebase();
-            isHost = true;
-            roomCode = generateRoomCode();
-            myPlayerId = 0;
-            playerNames = [nameInput];
-            players = [{ id: 0, name: nameInput, role: '', isAlive: true, seenRole: false }];
-
-            document.getElementById('roomCodeDisplay').textContent = roomCode;
-            document.getElementById('roomBadge').classList.remove('hidden');
-
-            initBroadcastChannel(roomCode);
-            initPeerJS(roomCode);
-            listenToOnlineRoom();
-            broadcastState('setup');
-
-            document.getElementById('setupTitle').textContent = `Lobby (Code: ${roomCode})`;
-            document.getElementById('setupSubtitle').textContent = 'Share room code with players';
-            document.getElementById('localPlayerInputBox').classList.add('hidden');
-            switchScreen('setupScreen');
-            renderSetupPlayerList();
-        }
-
-        async function joinOnlineRoom() {
-            sfx.click();
-            const nameInput = document.getElementById('myPlayerNameInput').value.trim();
-            const code = document.getElementById('roomCodeInput').value.trim().toUpperCase();
-
-            if (!nameInput || code.length !== 4) {
-                alert('Please enter your name and 4-letter room code.');
-                return;
-            }
-
-            await initFirebase();
-            isHost = false;
-            roomCode = code;
-
-            initBroadcastChannel(roomCode);
-            initPeerJS(roomCode);
-            document.getElementById('roomCodeDisplay').textContent = roomCode;
-            document.getElementById('roomBadge').classList.remove('hidden');
-
-            listenToOnlineRoom();
-
-            // Broadcast join request to existing room channel fallback
-            if (networkChannel) {
-                networkChannel.postMessage({ type: 'JOIN_REQUEST', name: nameInput });
-            }
-
-            if (db) {
-                try {
-                    const { doc, getDoc, setDoc } = window.firebaseImports;
-                    const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomCode);
-                    const snap = await getDoc(roomRef);
-
-                    if (snap.exists()) {
-                        const data = snap.data();
-                        const existing = data.players || [];
-                        let pIndex = existing.findIndex(p => p.name.toLowerCase() === nameInput.toLowerCase());
-
-                        if (pIndex === -1) {
-                            pIndex = existing.length;
-                            existing.push({ id: pIndex, name: nameInput, role: '', isAlive: true, seenRole: false });
-                            await setDoc(roomRef, { players: existing }, { merge: true });
-                        }
-                        myPlayerId = pIndex;
-                    }
-                } catch(e) {}
-            }
-
-            document.getElementById('setupTitle').textContent = `Lobby (Code: ${roomCode})`;
-            document.getElementById('setupSubtitle').textContent = 'Waiting for host to start...';
-            document.getElementById('localPlayerInputBox').classList.add('hidden');
-            switchScreen('setupScreen');
-        }
-
-        function listenToOnlineRoom() {
-            if (roomUnsubscribe) roomUnsubscribe();
-            if (!db) return;
-            try {
-                const { doc, onSnapshot } = window.firebaseImports;
-                const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomCode);
-
-                roomUnsubscribe = onSnapshot(roomRef, (snapshot) => {
-                    if (!snapshot.exists()) return;
-                    applyRoomState(snapshot.data());
-                });
-            } catch(e) {}
-        }
-
-        function syncOnlineUI(roomData) {
-            if (gameMode !== 'online') return;
-
-            if (roomData.status === 'roles') {
-                if (document.getElementById('roleDistributionScreen').classList.contains('hidden')) {
-                    switchScreen('roleDistributionScreen');
-                }
-                const myName = players[myPlayerId] ? players[myPlayerId].name : '';
-                document.getElementById('roleScreenTitle').textContent = `Your Role (${myName})`;
-                renderRoleDistributionGrid();
-            } else if (roomData.status === 'discussion') {
-                if (document.getElementById('discussionScreen').classList.contains('hidden')) {
-                    switchScreen('discussionScreen');
-                }
-                document.getElementById('promptText').textContent = `"${roomData.currentPrompt || ''}"`;
-                updateDiscussionHeader();
-                renderAlivePlayersBadges();
-
-                document.getElementById('newPromptBtn').style.display = isHost ? 'inline-flex' : 'none';
-                document.getElementById('startVotingBtn').style.display = isHost ? 'block' : 'none';
-            } else if (roomData.status === 'voting') {
-                if (document.getElementById('votingScreen').classList.contains('hidden')) {
-                    switchScreen('votingScreen');
-                }
-                setupOnlineVotingView();
-            } else if (roomData.status === 'result') {
-                if (document.getElementById('roundResultScreen').classList.contains('hidden')) {
-                    switchScreen('roundResultScreen');
-                    if (roomData.roundResult) calculateAndShowResultsUI(roomData.roundResult);
-                }
-                document.getElementById('nextRoundBtn').style.display = isHost ? 'block' : 'none';
-            } else if (roomData.status === 'gameover') {
-                if (document.getElementById('gameOverScreen').classList.contains('hidden')) {
-                    switchScreen('gameOverScreen');
-                    showGameOverUI(roomData.winner);
-                }
-            }
-        }
-
-        function handleAddPlayer(e) {
-            e.preventDefault();
-            sfx.click();
-            const input = document.getElementById('playerNameInput');
-            const name = input.value.trim();
-
-            if (!name || playerNames.length >= 12) return;
-
-            playerNames.push(name);
-            input.value = '';
-            renderSetupPlayerList();
-        }
-
-        function removePlayer(index) {
-            sfx.click();
-            if (gameMode === 'online') return;
-            playerNames.splice(index, 1);
-            renderSetupPlayerList();
-        }
-
-        function renderSetupPlayerList() {
-            const listContainer = document.getElementById('playerList');
-            listContainer.innerHTML = '';
-
-            const gradients = ['avatar-gradient-1', 'avatar-gradient-2', 'avatar-gradient-3', 'avatar-gradient-4', 'avatar-gradient-5'];
-
-            playerNames.forEach((name, idx) => {
-                const gradClass = gradients[idx % gradients.length];
-                const item = document.createElement('div');
-                item.className = 'flex justify-between items-center bg-white/5 border border-white/10 px-3.5 py-2.5 rounded-2xl font-bold text-sm text-white';
-                item.innerHTML = `
-                    <div class="flex items-center gap-2.5">
-                        <div class="w-7 h-7 rounded-xl ${gradClass} flex items-center justify-center font-black text-xs text-slate-950">
-                            ${name.charAt(0).toUpperCase()}
-                        </div>
-                        <span>${escapeHTML(name)} ${gameMode === 'online' && idx === myPlayerId ? '<span class="text-xs text-blue-400 font-extrabold">(You)</span>' : ''}</span>
-                    </div>
-                    ${gameMode === 'local' ? `
-                    <button onclick="removePlayer(${idx})" class="text-slate-500 hover:text-white p-1 transition-colors">
-                        ✕
-                    </button>` : ''}
-                `;
-                listContainer.appendChild(item);
-            });
-
-            const count = playerNames.length;
-            document.getElementById('playerCount').textContent = count;
-            const mafiaCount = Math.ceil(count / 3);
-            document.getElementById('mafiaCount').textContent = count >= 5 ? mafiaCount : 0;
-
-            const startBtn = document.getElementById('startGameBtn');
-            if (gameMode === 'online') {
-                startBtn.disabled = !isHost || count < 5 || count > 12;
-            } else {
-                startBtn.disabled = count < 5 || count > 12;
-            }
-        }
-
-        function escapeHTML(str) {
-            return str.replace(/[&<>'"]/g, tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag));
-        }
-
-        function assignShuffledRoles(playerList) {
-            const count = playerList.length;
-            const mafiaNum = Math.ceil(count / 3);
-            let roles = Array(mafiaNum).fill('Mafia Imposter').concat(Array(count - mafiaNum).fill('Innocent Civilian'));
-            roles.sort(() => Math.random() - 0.5);
-
-            return playerList.map((p, i) => ({
-                ...p,
-                role: roles[i],
-                isAlive: true,
-                seenRole: false
-            }));
-        }
-
-        async function startGame() {
-            sfx.click();
-            forfeitEnabled = document.getElementById('forfeitsCheckbox').checked;
-
-            if (gameMode === 'local') {
-                let initialPlayers = playerNames.map((name, i) => ({ id: i, name: name }));
-                players = assignShuffledRoles(initialPlayers);
-                switchScreen('roleDistributionScreen');
-                renderRoleDistributionGrid();
-            } else if (gameMode === 'online' && isHost) {
-                players = assignShuffledRoles(players);
-                broadcastState('roles');
-            }
-        }
-
-        function renderRoleDistributionGrid() {
-            const grid = document.getElementById('rolePlayerGrid');
-            grid.innerHTML = '';
-
-            if (gameMode === 'local') {
-                let allSeen = true;
-                players.forEach(p => {
-                    if (!p.seenRole) allSeen = false;
-
-                    const btn = document.createElement('button');
-                    btn.onclick = () => showRoleModal(p.id);
-                    btn.className = `p-4 rounded-2xl font-black text-sm flex flex-col items-center justify-center gap-2 border transition-all ${
-                        p.seenRole
-                            ? 'bg-white/5 border-white/5 text-slate-500'
-                            : 'beta-card border-white/10 text-white hover:border-blue-400/50 shadow-lg active:scale-95'
-                    }`;
-
-                    btn.innerHTML = `
-                        <span class="truncate w-full text-center font-black">${escapeHTML(p.name)}</span>
-                        <span class="text-[10px] px-2 py-0.5 rounded-full font-bold ${
-                            p.seenRole ? 'bg-white/5 text-slate-500' : 'bg-blue-500/20 text-blue-400 border border-blue-400/30'
-                        }">
-                            ${p.seenRole ? 'Seen ✓' : 'Tap to View'}
-                        </span>
-                    `;
-                    grid.appendChild(btn);
-                });
-                document.getElementById('startDiscussionBtn').disabled = !allSeen;
-            } else {
-                const myPlayer = players[myPlayerId];
-                if (!myPlayer) return;
-
-                const btn = document.createElement('button');
-                btn.onclick = () => showRoleModal(myPlayer.id);
-                btn.className = 'col-span-2 beta-card p-6 rounded-3xl font-black text-base flex flex-col items-center justify-center gap-2 border border-white/10 text-white hover:border-blue-400/50 shadow-2xl active:scale-95';
-                btn.innerHTML = `
-                    <span class="font-black text-lg">View Secret Role for ${escapeHTML(myPlayer.name)}</span>
-                    <span class="text-xs px-3 py-1 rounded-full font-bold bg-blue-500/20 text-blue-400 border border-blue-400/30">Tap to Reveal</span>
-                `;
-                grid.appendChild(btn);
-
-                const startBtn = document.getElementById('startDiscussionBtn');
-                startBtn.disabled = !isHost;
-                startBtn.textContent = isHost ? "Start Interrogation Phase" : "Waiting for Host...";
-            }
-        }
-
-        function showRoleModal(playerId) {
-            sfx.reveal();
-            const p = players.find(item => item.id === playerId);
-            if (!p) return;
-
-            document.getElementById('modalPlayerName').textContent = p.name;
-            const graphicBox = document.getElementById('roleGraphicBox');
-            const iconBox = document.getElementById('roleIcon');
-            const title = document.getElementById('roleTitle');
-            const teammatesBox = document.getElementById('mafiaTeammatesBox');
-
-            if (p.role === 'Mafia Imposter') {
-                graphicBox.className = 'py-6 px-4 rounded-2xl flex flex-col items-center justify-center gap-2 bg-blue-600/20 border border-blue-400/40 text-blue-400';
-                iconBox.textContent = '🕵️‍♂️';
-                title.textContent = 'MAFIA IMPOSTER';
-
-                const teammates = players.filter(m => m.role === 'Mafia Imposter' && m.id !== p.id).map(m => m.name);
-                if (teammates.length > 0) {
-                    document.getElementById('mafiaTeammatesList').textContent = teammates.join(', ');
-                    teammatesBox.classList.remove('hidden');
-                } else {
-                    teammatesBox.classList.add('hidden');
-                }
-            } else {
-                graphicBox.className = 'py-6 px-4 rounded-2xl flex flex-col items-center justify-center gap-2 bg-slate-800 border border-white/20 text-white';
-                iconBox.textContent = '🛡️';
-                title.textContent = 'INNOCENT CIVILIAN';
-                teammatesBox.classList.add('hidden');
-            }
-
-            p.seenRole = true;
-            document.getElementById('roleRevealModal').classList.remove('hidden');
-        }
-
-        function hideRoleModal() {
-            sfx.click();
-            document.getElementById('roleRevealModal').classList.add('hidden');
-            renderRoleDistributionGrid();
-        }
-
-        async function startDiscussionPhase() {
-            sfx.click();
-            const randomPrompt = PROMPT_TEMPLATES[Math.floor(Math.random() * PROMPT_TEMPLATES.length)];
-            window.currentPrompt = randomPrompt;
-
-            if (gameMode === 'local') {
-                switchScreen('discussionScreen');
-                updateDiscussionHeader();
-                document.getElementById('promptText').textContent = `"${randomPrompt}"`;
-                renderAlivePlayersBadges();
-            } else if (gameMode === 'online' && isHost) {
-                broadcastState('discussion');
-            }
-        }
-
-        function updateDiscussionHeader() {
-            const mafiaAlive = players.filter(p => p.isAlive && p.role === 'Mafia Imposter').length;
-            document.getElementById('discussionMafiaRemaining').textContent = `${mafiaAlive} Imposters`;
-        }
-
-        async function generateNewPrompt() {
-            sfx.click();
-            const randomPrompt = PROMPT_TEMPLATES[Math.floor(Math.random() * PROMPT_TEMPLATES.length)];
-            window.currentPrompt = randomPrompt;
-
-            if (gameMode === 'local') {
-                document.getElementById('promptText').textContent = `"${randomPrompt}"`;
-            } else if (gameMode === 'online' && isHost) {
-                broadcastState('discussion');
-            }
-        }
-
-        function renderAlivePlayersBadges() {
-            const container = document.getElementById('alivePlayersList');
-            container.innerHTML = '';
-
-            players.filter(p => p.isAlive).forEach(p => {
-                const badge = document.createElement('span');
-                badge.className = 'px-3.5 py-1.5 rounded-xl beta-card text-white font-black text-xs shadow-sm border border-white/10';
-                badge.textContent = p.name;
-                container.appendChild(badge);
-            });
-        }
-
-        async function startVotingPhase() {
-            sfx.click();
-            votes = {};
-            if (gameMode === 'local') {
-                switchScreen('votingScreen');
-                const alivePlayers = players.filter(p => p.isAlive);
-                currentVoterIndex = 0;
-                setupVoterTurn(alivePlayers[currentVoterIndex]);
-            } else if (gameMode === 'online' && isHost) {
-                broadcastState('voting');
-            }
-        }
-
-        function setupVoterTurn(voter) {
-            document.getElementById('votingPassPhoneState').classList.remove('hidden');
-            document.getElementById('votingBallotState').classList.add('hidden');
-            document.getElementById('onlineWaitingVotesBanner').classList.add('hidden');
-
-            document.getElementById('nextVoterName').textContent = voter.name;
-            document.getElementById('voterBtnName').textContent = voter.name;
-        }
-
-        function setupOnlineVotingView() {
-            document.getElementById('votingPassPhoneState').classList.add('hidden');
-            const myPlayer = players[myPlayerId];
-
-            if (!myPlayer || !myPlayer.isAlive) {
-                document.getElementById('votingBallotState').classList.add('hidden');
-                document.getElementById('onlineWaitingVotesBanner').classList.remove('hidden');
-                document.getElementById('voteProgressText').textContent = 'Eliminated. Spectating votes...';
-                return;
-            }
-
-            if (votes[myPlayerId] !== undefined) {
-                document.getElementById('votingBallotState').classList.add('hidden');
-                document.getElementById('onlineWaitingVotesBanner').classList.remove('hidden');
-                const aliveCount = players.filter(p => p.isAlive).length;
-                const votesCount = Object.keys(votes).length;
-                document.getElementById('voteProgressText').textContent = `${votesCount} / ${aliveCount} votes submitted`;
-                return;
-            }
-
-            document.getElementById('votingBallotState').classList.remove('hidden');
-            document.getElementById('onlineWaitingVotesBanner').classList.add('hidden');
-            document.getElementById('activeVoterTitle').textContent = myPlayer.name;
-
-            renderBallotOptions(myPlayer.id);
-        }
-
-        function revealBallot() {
-            sfx.click();
-            document.getElementById('votingPassPhoneState').classList.add('hidden');
-            document.getElementById('votingBallotState').classList.remove('hidden');
-
-            const alivePlayers = players.filter(p => p.isAlive);
-            const activeVoter = alivePlayers[currentVoterIndex];
-
-            document.getElementById('activeVoterTitle').textContent = activeVoter.name;
-            renderBallotOptions(activeVoter.id);
-        }
-
-        function renderBallotOptions(voterId) {
-            const optionsContainer = document.getElementById('ballotOptionsList');
-            optionsContainer.innerHTML = '';
-
-            const submitBtn = document.getElementById('submitVoteBtn');
-            submitBtn.disabled = true;
-
-            const alivePlayers = players.filter(p => p.isAlive);
-
-            alivePlayers.forEach(candidate => {
-                if (candidate.id === voterId) return;
-
-                const label = document.createElement('label');
-                label.className = 'flex items-center justify-between p-3.5 rounded-2xl bg-white/5 border border-white/10 hover:border-blue-400/50 cursor-pointer font-extrabold text-sm text-white transition-all';
-                label.innerHTML = `
-                    <span>${escapeHTML(candidate.name)}</span>
-                    <input type="radio" name="ballotVote" value="${candidate.id}" onchange="document.getElementById('submitVoteBtn').disabled = false" class="w-5 h-5 text-blue-500 focus:ring-blue-500 bg-white/5 border-white/20">
-                `;
-                optionsContainer.appendChild(label);
-            });
-        }
-
-        async function submitVote() {
-            sfx.click();
-            const selected = document.querySelector('input[name="ballotVote"]:checked');
-            if (!selected) return;
-
-            const targetId = parseInt(selected.value);
-
-            if (gameMode === 'local') {
-                const alivePlayers = players.filter(p => p.isAlive);
-                const activeVoter = alivePlayers[currentVoterIndex];
-
-                votes[activeVoter.id] = targetId;
-                currentVoterIndex++;
-
-                if (currentVoterIndex < alivePlayers.length) {
-                    setupVoterTurn(alivePlayers[currentVoterIndex]);
-                } else {
-                    calculateAndShowResultsLocal();
-                }
-            } else if (gameMode === 'online') {
-                votes[myPlayerId] = targetId;
-                
-                if (hostConn && hostConn.open) {
-                    hostConn.send({ type: 'SUBMIT_VOTE', voterId: myPlayerId, targetId: targetId });
-                }
-
-                if (networkChannel) {
-                    networkChannel.postMessage({ type: 'SUBMIT_VOTE', voterId: myPlayerId, targetId: targetId });
-                }
-
-                if (isHost) {
-                    const aliveCount = players.filter(p => p.isAlive).length;
-                    if (Object.keys(votes).length >= aliveCount) {
-                        const roundResult = processVotesTally(votes);
-                        players = roundResult.updatedPlayers;
-                        broadcastState('result', { roundResult: roundResult });
-                    } else {
-                        broadcastState('voting');
-                    }
-                } else {
-                    setupOnlineVotingView();
-                }
-            }
-        }
-
-        function processVotesTally(votesMap) {
-            const tally = {};
-            Object.values(votesMap).forEach(targetId => {
-                tally[targetId] = (tally[targetId] || 0) + 1;
-            });
-
-            let highestVotes = 0;
-            let eliminatedId = null;
-            let isTie = false;
-
-            for (const [targetId, count] of Object.entries(tally)) {
-                if (count > highestVotes) {
-                    highestVotes = count;
-                    eliminatedId = parseInt(targetId);
-                    isTie = false;
-                } else if (count === highestVotes) {
-                    isTie = true;
-                }
-            }
-
-            let updatedPlayers = [...players];
-            let eliminatedPlayer = null;
-
-            if (!isTie && eliminatedId !== null) {
-                updatedPlayers = players.map(p => {
-                    if (p.id === eliminatedId) {
-                        eliminatedPlayer = { ...p, isAlive: false };
-                        return eliminatedPlayer;
-                    }
-                    return p;
-                });
-            }
-
-            const forfeitText = (forfeitEnabled && eliminatedPlayer) 
-                ? FORFEITS_BANK[Math.floor(Math.random() * FORFEITS_BANK.length)] 
-                : null;
-
-            return {
-                isTie,
-                eliminatedPlayer,
-                forfeitText,
-                votesMap,
-                updatedPlayers
-            };
-        }
-
-        function calculateAndShowResultsLocal() {
-            const roundResult = processVotesTally(votes);
-            players = roundResult.updatedPlayers;
-            switchScreen('roundResultScreen');
-            calculateAndShowResultsUI(roundResult);
-        }
-
-        function calculateAndShowResultsUI(result) {
-            sfx.eliminate();
-            const verdictBadge = document.getElementById('verdictBadge');
-            const verdictTitle = document.getElementById('verdictTitle');
-            const verdictSubtitle = document.getElementById('verdictSubtitle');
-            const forfeitContainer = document.getElementById('forfeitContainer');
-
-            if (result.isTie || !result.eliminatedPlayer) {
-                verdictBadge.className = 'w-16 h-16 mx-auto rounded-2xl flex items-center justify-center bg-white/10 border border-white/20 text-white';
-                verdictBadge.textContent = '⚖️';
-                verdictTitle.textContent = "It's A Tie!";
-                verdictSubtitle.textContent = "Nobody was voted out this round.";
-                forfeitContainer.classList.add('hidden');
-            } else {
-                const ep = result.eliminatedPlayer;
-                if (ep.role === 'Mafia Imposter') {
-                    verdictBadge.className = 'w-16 h-16 mx-auto rounded-2xl flex items-center justify-center bg-blue-600/20 border border-blue-400/40 text-blue-400';
-                    verdictBadge.textContent = '🕵️‍♂️';
-                } else {
-                    verdictBadge.className = 'w-16 h-16 mx-auto rounded-2xl flex items-center justify-center bg-slate-800 border border-white/20 text-white';
-                    verdictBadge.textContent = '🛡️';
-                }
-
-                verdictTitle.textContent = `${ep.name} Was Voted Out!`;
-                verdictSubtitle.innerHTML = `Role Discovered: <strong class="${ep.role === 'Mafia Imposter' ? 'text-blue-400' : 'text-slate-200'} uppercase font-black">${ep.role}</strong>`;
-
-                if (result.forfeitText) {
-                    document.getElementById('forfeitText').textContent = `"${result.forfeitText}"`;
-                    forfeitContainer.classList.remove('hidden');
-                } else {
-                    forfeitContainer.classList.add('hidden');
-                }
-            }
-
-            const breakdownContainer = document.getElementById('voteBreakdownList');
-            breakdownContainer.innerHTML = '';
-
-            Object.entries(result.votesMap || {}).forEach(([voterId, targetId]) => {
-                const voter = players.find(p => p.id === parseInt(voterId));
-                const target = players.find(p => p.id === parseInt(targetId));
-
-                if (voter && target) {
-                    const item = document.createElement('div');
-                    item.className = 'flex justify-between items-center py-1.5 border-b border-white/5 text-slate-300';
-                    item.innerHTML = `
-                        <span>${escapeHTML(voter.name)}</span>
-                        <span class="text-slate-500 text-[10px]">voted for</span>
-                        <span class="font-extrabold text-blue-400">${escapeHTML(target.name)}</span>
-                    `;
-                    breakdownContainer.appendChild(item);
-                }
-            });
-        }
-
-        async function continueAfterRound() {
-            sfx.click();
-            const aliveMafia = players.filter(p => p.isAlive && p.role === 'Mafia Imposter').length;
-            const aliveCivilians = players.filter(p => p.isAlive && p.role === 'Innocent Civilian').length;
-
-            let winner = null;
-            if (aliveMafia === 0) winner = 'CIVILIANS';
-            else if (aliveMafia >= aliveCivilians) winner = 'MAFIA';
-
-            if (winner) {
-                if (gameMode === 'local') {
-                    switchScreen('gameOverScreen');
-                    showGameOverUI(winner);
-                } else if (gameMode === 'online' && isHost) {
-                    broadcastState('gameover', { winner: winner });
-                }
-            } else {
-                startDiscussionPhase();
-            }
-        }
-
-        function showGameOverUI(winner) {
-            const iconBox = document.getElementById('victoryIcon');
-            const title = document.getElementById('victoryTitle');
-            const subtitle = document.getElementById('victorySubtitle');
-
-            if (winner === 'CIVILIANS') {
-                iconBox.className = 'w-20 h-20 mx-auto rounded-3xl flex items-center justify-center bg-white/10 border border-white/20 text-white';
-                iconBox.textContent = '🏆';
-                title.textContent = 'CIVILIANS WIN!';
-                title.className = 'text-3xl font-black text-white';
-                subtitle.textContent = 'All Mafia Imposters were caught!';
-            } else {
-                iconBox.className = 'w-20 h-20 mx-auto rounded-3xl flex items-center justify-center bg-blue-600/20 border border-blue-400/40 text-blue-400';
-                iconBox.textContent = '🕵️‍♂️';
-                title.textContent = 'MAFIA WINS!';
-                title.className = 'text-3xl font-black text-blue-400';
-                subtitle.textContent = 'The Mafia took control of the room!';
-            }
-
-            const rosterContainer = document.getElementById('finalRosterList');
-            rosterContainer.innerHTML = '';
-
-            players.forEach(p => {
-                const item = document.createElement('div');
-                item.className = 'flex justify-between items-center p-3 rounded-2xl bg-white/5 border border-white/5 font-extrabold text-sm';
-                item.innerHTML = `
-                    <div class="flex items-center gap-2">
-                        <span class="text-white">${escapeHTML(p.name)}</span>
-                        ${!p.isAlive ? '<span class="text-[10px] font-bold text-slate-500">(Eliminated)</span>' : ''}
-                    </div>
-                    <span class="text-xs font-black uppercase tracking-wider ${p.role === 'Mafia Imposter' ? 'text-blue-400' : 'text-slate-200'}">
-                        ${p.role}
-                    </span>
-                `;
-                rosterContainer.appendChild(item);
-            });
-        }
-
-        async function resetGameSamePlayers() {
-            sfx.click();
-            let basePlayers = players.map(p => ({ id: p.id, name: p.name }));
-            players = assignShuffledRoles(basePlayers);
-
-            if (gameMode === 'local') {
-                switchScreen('roleDistributionScreen');
-                renderRoleDistributionGrid();
-            } else if (gameMode === 'online' && isHost) {
-                broadcastState('roles');
-            }
-        }
-
-        function resetGameNewPlayers() {
-            sfx.click();
-            cleanPeer();
-            if (roomUnsubscribe) roomUnsubscribe();
-            if (networkChannel) networkChannel.close();
-            roomCode = null;
-            document.getElementById('roomBadge').classList.add('hidden');
-            switchScreen('modeSelectScreen');
-        }
-
-        function switchScreen(screenId) {
-            const screens = ['modeSelectScreen', 'onlineLobbyChoiceScreen', 'setupScreen', 'roleDistributionScreen', 'discussionScreen', 'votingScreen', 'roundResultScreen', 'gameOverScreen'];
-            screens.forEach(id => {
-                const el = document.getElementById(id);
-                if (el) {
-                    if (id === screenId) el.classList.remove('hidden');
-                    else el.classList.add('hidden');
-                }
-            });
-        }
-    </script>
+      } else {
+        G.lastKilledPlayer = null;
+      }
+
+      if (checkWinConditions()) return;
+
+      G.phase = 'vote_results';
+      if (G.netMode === 'online') broadcastState();
+      else renderState();
+    }
+
+    function renderVoteResults() {
+      return `
+        <div class="flex flex-col items-center text-center space-y-6 w-full">
+          <div>
+            <h2 class="text-3xl font-black text-white">BALLOT TALLY RESULTS</h2>
+            <p class="text-xs text-slate-400 mt-1">The crew members have spoken!</p>
+          </div>
+
+          ${G.lastKilledPlayer ? `
+            <div class="w-full bg-red-950/40 border border-red-800/60 p-5 rounded-2xl flex flex-col items-center">
+              <span class="text-xs text-red-400 font-bold uppercase tracking-widest mb-1">ELIMINATED BY BALLOT</span>
+              <span class="text-2xl font-black text-white">${G.lastKilledPlayer.name}</span>
+              <span class="text-xs text-slate-300 mt-2">Their true identity was: <strong class="text-red-400 uppercase">${G.lastKilledPlayer.role.replace('_', ' ')}</strong></span>
+            </div>
+          ` : `
+            <div class="w-full bg-slate-900/90 border border-slate-700/80 p-5 rounded-2xl">
+              <span class="text-base font-bold text-amber-400">TIE VOTE DETECTED!</span>
+              <p class="text-xs text-slate-400 mt-1">No player was eliminated by ballot today.</p>
+            </div>
+          `}
+
+          <button onclick="startDiscussion()" class="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-sm rounded-xl transition-all shadow-lg glow-blue">
+            ${G.mode === 'murder_mystery' ? 'START NEXT 3-MIN DISCUSSION &rarr;' : 'START NEXT 5-MIN DISCUSSION &rarr;'}
+          </button>
+        </div>
+      `;
+    }
+
+    // Win Check Logic
+    function checkWinConditions() {
+      const badGuys = G.players.filter(p => p.alive && (p.role === 'murderer' || p.role === 'mafia'));
+      const goodGuys = G.players.filter(p => p.alive && p.role !== 'murderer' && p.role !== 'mafia');
+
+      if (badGuys.length === 0) {
+        G.winner = G.mode === 'murder_mystery' ? 'MANOR GUESTS & DETECTIVE' : 'CIVILIANS';
+        G.phase = 'game_over';
+        if (G.netMode === 'online') broadcastState();
+        else renderState();
+        return true;
+      }
+
+      if (badGuys.length >= goodGuys.length) {
+        G.winner = G.mode === 'murder_mystery' ? 'MURDERERS' : 'MAFIA';
+        G.phase = 'game_over';
+        if (G.netMode === 'online') broadcastState();
+        else renderState();
+        return true;
+      }
+
+      return false;
+    }
+
+    // --- SCREEN 11: GAME OVER ---
+    function renderGameOver() {
+      const isBadWin = G.winner === 'MURDERERS' || G.winner === 'MAFIA';
+
+      return `
+        <div class="flex flex-col items-center text-center space-y-6 w-full animate-float">
+          <div>
+            <span class="text-xs font-bold text-slate-400 uppercase tracking-widest block">GAME CONCLUDED</span>
+            <h2 class="text-4xl font-black ${isBadWin ? 'text-red-400' : 'text-emerald-400'} mt-1">${G.winner} VICTORY!</h2>
+          </div>
+
+          <div class="w-full bg-slate-950/60 border border-slate-800 rounded-2xl p-4 max-h-56 overflow-y-auto space-y-2">
+            <span class="text-xs text-slate-400 font-bold uppercase tracking-wider block mb-1">ALL PLAYER ROLES</span>
+            ${G.players.map(p => `
+              <div class="flex items-center justify-between bg-slate-900/90 border border-slate-800 rounded-xl px-4 py-2 text-xs font-semibold">
+                <span class="text-white">${p.name}</span>
+                <span class="${p.role === 'murderer' || p.role === 'mafia' ? 'text-red-400' : 'text-emerald-400'} uppercase font-bold">${p.role.replace('_', ' ')}</span>
+              </div>
+            `).join('')}
+          </div>
+
+          <button onclick="G.phase='mode_select'; renderState();" class="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-sm rounded-xl shadow-lg glow-blue transition-all">
+            PLAY AGAIN &rarr;
+          </button>
+        </div>
+      `;
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      renderState();
+    });
+    window.onload = function() {
+      renderState();
+    };
+  </script>
 </body>
 </html>
