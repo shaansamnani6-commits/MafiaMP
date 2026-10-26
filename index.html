@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Who Is The Imposter? - Party & Mafia Games</title>
+  <title>Who Is The Imposter? - Beta Squad Edition</title>
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- PeerJS for P2P Networking -->
   <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
-  <!-- Google Font: Plus Jakarta Sans -->
+  <!-- Google Font -->
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <style>
     body {
@@ -18,10 +18,16 @@
       color: #ffffff;
       user-select: none;
       min-height: 100vh;
+      margin: 0;
+      padding: 24px 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
     }
 
     .card-glass {
-      background: rgba(22, 30, 60, 0.65);
+      background: rgba(22, 30, 60, 0.85);
       backdrop-filter: blur(16px);
       -webkit-backdrop-filter: blur(16px);
       border: 1px solid rgba(255, 255, 255, 0.12);
@@ -45,186 +51,87 @@
     .glow-indigo {
       box-shadow: 0 0 30px rgba(99, 102, 241, 0.4);
     }
-
-    @keyframes pulse-slow {
-      0%, 100% { transform: scale(1); opacity: 1; }
-      50% { transform: scale(1.02); opacity: 0.9; }
-    }
-    .animate-pulse-slow { animation: pulse-slow 3s infinite ease-in-out; }
-
-    @keyframes float {
-      0%, 100% { transform: translateY(0px); }
-      50% { transform: translateY(-6px); }
-    }
-    .animate-float { animation: float 4s infinite ease-in-out; }
   </style>
 </head>
-<body class="flex flex-col items-center justify-center p-4 overflow-x-hidden relative min-h-screen">
+<body>
 
-  <!-- Main App Window Container -->
-  <div id="app" class="w-full max-w-xl card-glass rounded-[32px] p-6 sm:p-10 relative z-10 overflow-hidden my-auto">
-    <!-- Dynamic Header -->
-    <header class="text-center mb-8">
+  <!-- Main Container -->
+  <div id="app" class="w-full max-w-xl card-glass rounded-[32px] p-6 sm:p-8 relative z-10 my-auto">
+    <!-- Header -->
+    <header class="text-center mb-6">
       <div class="inline-flex items-center gap-2 px-4 py-1.5 bg-indigo-950/70 border border-indigo-500/30 rounded-full text-indigo-300 text-xs font-bold tracking-widest uppercase mb-3 shadow-inner">
-        <span id="gameModeBadge">PARTY GAME EDITION</span>
+        <span id="gameModeBadge">BETA SQUAD STYLE EDITION</span>
       </div>
       <h1 id="headerTitle" class="text-3xl sm:text-4xl font-extrabold tracking-tight text-white">
         Who Is The Imposter?
       </h1>
       <p id="headerSubtitle" class="text-xs sm:text-sm text-slate-400 mt-2 font-medium max-w-md mx-auto">
-        Find out which member of your crew is hiding the secret identity!
+        Multi-round deductions, dramatic eliminations, and game forfeits!
       </p>
     </header>
 
-    <!-- Dynamic Main Screen Container -->
-    <main id="screenContainer" class="flex flex-col items-center w-full min-h-[380px] justify-center">
-      <!-- Injected via JavaScript -->
+    <!-- Screen Container -->
+    <main id="screenContainer" class="flex flex-col items-center w-full justify-center">
+      <!-- Dynamically Rendered -->
     </main>
   </div>
 
-  <!-- Audio Effects using Web Audio API -->
+  <!-- Audio & TTS Engine -->
   <script>
     class SoundFX {
-      constructor() {
-        this.ctx = null;
-      }
-      init() {
-        if (!this.ctx) {
-          this.ctx = new (window.AudioContext || window.webkitAudioContext)();
-        }
-      }
+      constructor() { this.ctx = null; }
+      init() { if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)(); }
       click() {
-        this.init();
-        const osc = this.ctx.createOscillator();
-        const gain = this.ctx.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(600, this.ctx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(200, this.ctx.currentTime + 0.08);
-        gain.gain.setValueAtTime(0.3, this.ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.08);
-        osc.connect(gain);
-        gain.connect(this.ctx.destination);
-        osc.start();
-        osc.stop(this.ctx.currentTime + 0.08);
+        try {
+          this.init();
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.frequency.setValueAtTime(600, this.ctx.currentTime);
+          osc.frequency.exponentialRampToValueAtTime(200, this.ctx.currentTime + 0.08);
+          gain.gain.setValueAtTime(0.3, this.ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.08);
+          osc.connect(gain); gain.connect(this.ctx.destination);
+          osc.start(); osc.stop(this.ctx.currentTime + 0.08);
+        } catch(e) {}
       }
       elim() {
-        this.init();
-        const osc = this.ctx.createOscillator();
-        const gain = this.ctx.createGain();
-        osc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(180, this.ctx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(40, this.ctx.currentTime + 0.5);
-        gain.gain.setValueAtTime(0.5, this.ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.5);
-        osc.connect(gain);
-        gain.connect(this.ctx.destination);
-        osc.start();
-        osc.stop(this.ctx.currentTime + 0.5);
+        try {
+          this.init();
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(180, this.ctx.currentTime);
+          osc.frequency.exponentialRampToValueAtTime(40, this.ctx.currentTime + 0.5);
+          gain.gain.setValueAtTime(0.5, this.ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.5);
+          osc.connect(gain); gain.connect(this.ctx.destination);
+          osc.start(); osc.stop(this.ctx.currentTime + 0.5);
+        } catch(e) {}
       }
       gong() {
-        this.init();
-        const osc = this.ctx.createOscillator();
-        const gain = this.ctx.createGain();
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(110, this.ctx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(55, this.ctx.currentTime + 1.2);
-        gain.gain.setValueAtTime(0.6, this.ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 1.2);
-        osc.connect(gain);
-        gain.connect(this.ctx.destination);
-        osc.start();
-        osc.stop(this.ctx.currentTime + 1.2);
+        try {
+          this.init();
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(110, this.ctx.currentTime);
+          osc.frequency.exponentialRampToValueAtTime(55, this.ctx.currentTime + 1.2);
+          gain.gain.setValueAtTime(0.6, this.ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 1.2);
+          osc.connect(gain); gain.connect(this.ctx.destination);
+          osc.start(); osc.stop(this.ctx.currentTime + 1.2);
+        } catch(e) {}
       }
     }
     const sfx = new SoundFX();
-
-    // Voice Command Synthesis via Gemini TTS API
-    async function playVoiceCommand(promptText, voiceName = "Fenrir") {
-      try {
-        const apiKey = "";
-        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`;
-        const payload = {
-          contents: [{ parts: [{ text: promptText }] }],
-          generationConfig: {
-            responseModalities: ["AUDIO"],
-            speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voiceName } } }
-          },
-          model: "gemini-2.5-flash-preview-tts"
-        };
-        const res = await fetch(apiUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-        const data = await res.json();
-        const part = data?.candidates?.[0]?.content?.parts?.[0];
-        if (part && part.inlineData && part.inlineData.data) {
-          const mimeType = part.inlineData.mimeType || "audio/L16;rate=24000";
-          const match = mimeType.match(/rate=(\d+)/);
-          const sampleRate = match ? parseInt(match[1], 10) : 24000;
-          const pcmData = base64ToArrayBuffer(part.inlineData.data);
-          const pcm16 = new Int16Array(pcmData);
-          const wavBlob = pcmToWav(pcm16, sampleRate);
-          const audioUrl = URL.createObjectURL(wavBlob);
-          const audio = new Audio(audioUrl);
-          audio.play();
-        }
-      } catch (err) {
-        console.warn("TTS Voice Command failed/skipped:", err);
-      }
-    }
-
-    function base64ToArrayBuffer(base64) {
-      const binaryString = atob(base64);
-      const bytes = new Uint8Array(binaryString.length);
-      for (let i = 0; i < binaryString.length; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
-      }
-      return bytes.buffer;
-    }
-
-    function pcmToWav(pcm16, sampleRate) {
-      const numChannels = 1;
-      const byteRate = sampleRate * numChannels * 2;
-      const blockAlign = numChannels * 2;
-      const buffer = new ArrayBuffer(44 + pcm16.length * 2);
-      const view = new DataView(buffer);
-
-      function writeString(offset, string) {
-        for (let i = 0; i < string.length; i++) {
-          view.setUint8(offset + i, string.charCodeAt(i));
-        }
-      }
-
-      writeString(0, 'RIFF');
-      view.setUint32(4, 36 + pcm16.length * 2, true);
-      writeString(8, 'WAVE');
-      writeString(12, 'fmt ');
-      view.setUint32(16, 16, true);
-      view.setUint16(20, 1, true);
-      view.setUint16(22, numChannels, true);
-      view.setUint32(24, sampleRate, true);
-      view.setUint32(28, byteRate, true);
-      view.setUint16(32, blockAlign, true);
-      view.setUint16(34, 16, true);
-      writeString(36, 'data');
-      view.setUint32(40, pcm16.length * 2, true);
-
-      let offset = 44;
-      for (let i = 0; i < pcm16.length; i++, offset += 2) {
-        view.setInt16(offset, pcm16[i], true);
-      }
-      return new Blob([buffer], { type: 'audio/wav' });
-    }
   </script>
 
-  <!-- Game Logic and Visual State Machine -->
+  <!-- Game State & Controller -->
   <script>
-    // Global State
     let G = {
       mode: 'murder_mystery', // 'murder_mystery' or 'mafia'
-      imposterCountMode: 'auto', // 'auto', 1, 2, 3
-      netMode: 'pass_phone', // 'pass_phone' or 'online'
+      imposterCountMode: 'auto',
+      netMode: 'pass_phone',
       roomCode: '',
       isHost: true,
       myPlayerId: '',
@@ -233,16 +140,34 @@
       currentRevealIdx: 0,
       showCardModal: false,
       currentVoterIdx: 0,
-      votes: {}, // voterId -> targetId
-      discussionTimeLeft: 180, // 3 mins for Murder Mystery, 5 mins for Mafia
+      votes: {},
+      discussionTimeLeft: 300,
       timerInterval: null,
-      nightTargetId: null,
-      lastKilledPlayer: null,
+      murdererTargetId: null,
+      lastEliminatedPlayer: null,
+      lastEliminatedForfeit: '',
       winner: null,
-      currentPrompt: ''
+      currentPrompt: '',
+      roundCount: 1
     };
 
-    // Shufflable Interrogation Prompts Pools
+    const betaSquadForfeits = [
+      "Must wear a blindfold during the next entire discussion cycle!",
+      "Must speak in a dramatic British accent for the rest of the game!",
+      "Must sit facing the wall during the next interrogation round!",
+      "Hand over your jacket / phone to the group until the game concludes!",
+      "Must answer every question with a question for the next 2 rounds!",
+      "Must do 20 push-ups right now in the center of the room!"
+    ];
+
+    const mafiaPrompts = [
+      "Who was trying to dominate the conversation or defend someone too quickly?",
+      "Which player's voting pattern or reaction during the last cycle felt out of character?",
+      "If the person to your left turns out to be part of the mafia, would you be surprised?",
+      "Who is sitting quietly without contributing much to the group deduction?",
+      "Who do you trust the absolute least in this circle right now and why?"
+    ];
+
     const murderMysteryPrompts = [
       "Who was acting overly quiet or evasive during the last few hours in the manor?",
       "Who do you suspect most of wandering the halls alone last night?",
@@ -251,21 +176,15 @@
       "Whose alibi or story about last night felt the most rehearsed or suspicious?"
     ];
 
-    const mafiaPrompts = [
-      "Who was trying to dominate the conversation or defend someone too quickly?",
-      "Which player's voting pattern or reaction during the last cycle felt out of character?",
-      "If the person to your left turns out to be part of the mafia, would you be surprised?",
-      "Who is sitting quietly without contributing much to the town's deduction?",
-      "Who do you trust the absolute least in this town right now and why?"
-    ];
-
     function getRandomPrompt() {
-      const pool = G.mode === 'murder_mystery' ? murderMysteryPrompts : mafiaPrompts;
-      const idx = Math.floor(Math.random() * pool.length);
-      return pool[idx];
+      const pool = G.mode === 'mafia' ? mafiaPrompts : murderMysteryPrompts;
+      return pool[Math.floor(Math.random() * pool.length)];
     }
 
-    // PeerJS Network Setup
+    function getRandomForfeit() {
+      return betaSquadForfeits[Math.floor(Math.random() * betaSquadForfeits.length)];
+    }
+
     let peer = null;
     let peerConns = [];
 
@@ -273,22 +192,16 @@
       return new Promise((resolve) => {
         try {
           if (peer) { try { peer.destroy(); } catch(e) {} }
-          peer = customId ? new Peer(customId) : new Peer();
+          peer = customId ? new Peer(customId, { host: '0.peerjs.com', port: 443, secure: true }) : new Peer({ host: '0.peerjs.com', port: 443, secure: true });
           let resolved = false;
           peer.on('open', (id) => { if (!resolved) { resolved = true; resolve(id); } });
           peer.on('connection', (conn) => {
             peerConns.push(conn);
             conn.on('data', (data) => handleIncomingData(data));
           });
-          peer.on('error', (err) => {
-            console.warn("PeerJS network warning:", err);
-            if (!resolved) { resolved = true; resolve(null); }
-          });
-          setTimeout(() => { if (!resolved) { resolved = true; resolve(null); } }, 3000);
-        } catch(e) {
-          console.error("PeerJS initialization error:", e);
-          resolve(null);
-        }
+          peer.on('error', () => { if (!resolved) { resolved = true; resolve(null); } });
+          setTimeout(() => { if (!resolved) { resolved = true; resolve(peer?.id || null); } }, 2000);
+        } catch(e) { resolve(null); }
       });
     }
 
@@ -322,7 +235,6 @@
       return code;
     }
 
-    // Role Distribution Logic (Fisher-Yates Shuffle)
     function shuffleArray(arr) {
       const array = [...arr];
       for (let i = array.length - 1; i > 0; i--) {
@@ -336,20 +248,19 @@
       const total = G.players.length;
       let badCount = 1;
       if (G.imposterCountMode === 'auto') {
-        if (total >= 6 && total <= 8) badCount = 2;
-        else if (total > 8) badCount = 3;
+        if (total >= 8 && total <= 10) badCount = 2;
+        else if (total > 10) badCount = 3;
       } else {
         badCount = Math.min(parseInt(G.imposterCountMode, 10), Math.floor(total / 2));
       }
 
       let roles = [];
-      if (G.mode === 'murder_mystery') {
-        for (let i = 0; i < badCount; i++) roles.push('murderer');
-        roles.push('detective'); // 1 Detective in Murder Mystery
-        while (roles.length < total) roles.push('manor_guest');
-      } else {
+      if (G.mode === 'mafia') {
         for (let i = 0; i < badCount; i++) roles.push('mafia');
         while (roles.length < total) roles.push('civilian');
+      } else {
+        for (let i = 0; i < badCount; i++) roles.push('murderer');
+        while (roles.length < total) roles.push('manor_guest');
       }
 
       roles = shuffleArray(roles);
@@ -357,18 +268,24 @@
         p.role = roles[idx];
         p.alive = true;
       });
+      G.roundCount = 1;
     }
 
-    // UI RENDERERS FOR ALL SCREENS WITH MATCHING DESIGN
     function renderState() {
       const container = document.getElementById('screenContainer');
       const badge = document.getElementById('gameModeBadge');
       const title = document.getElementById('headerTitle');
       const sub = document.getElementById('headerSubtitle');
 
-      badge.textContent = G.mode === 'murder_mystery' ? 'MURDER MYSTERY EDITION' : 'CLASSIC MAFIA EDITION';
-      title.textContent = G.mode === 'murder_mystery' ? 'Manor Murder Mystery' : 'Classic Mafia';
-      sub.textContent = G.mode === 'murder_mystery' ? 'Find the murderer before you are eliminated in the dark!' : 'Deduce the mafia members through town discussions and votes!';
+      if (G.mode === 'murder_mystery') {
+        badge.textContent = 'MURDER MYSTERY EDITION';
+        title.textContent = 'Manor Murder Mystery';
+        sub.textContent = 'Find the murderer before you are eliminated in the dark!';
+      } else {
+        badge.textContent = 'BETA SQUAD MAFIA EDITION';
+        title.textContent = 'Classic Mafia';
+        sub.textContent = 'Multi-round debates, secret alliances, and elimination forfeits.';
+      }
 
       switch (G.phase) {
         case 'mode_select':
@@ -383,11 +300,8 @@
         case 'discussion':
           container.innerHTML = renderDiscussion();
           break;
-        case 'night_approach':
-          container.innerHTML = renderNightApproach();
-          break;
-        case 'guests_close_eyes':
-          container.innerHTML = renderGuestsCloseEyes();
+        case 'night_approaching':
+          container.innerHTML = renderNightApproaching();
           break;
         case 'murderers_open_eyes':
           container.innerHTML = renderMurderersOpenEyes();
@@ -407,29 +321,29 @@
       }
     }
 
-    // --- SCREEN 1: MODE SELECT ---
     function renderModeSelect() {
+      const isMystery = G.mode === 'murder_mystery';
+      const isPassPhone = G.netMode === 'pass_phone';
+
       return `
         <div class="flex flex-col items-center w-full space-y-4">
-          <!-- Murder Mystery Card -->
-          <button onclick="selectGameMode('murder_mystery')" class="w-full text-left p-5 rounded-2xl card-interactive flex items-center justify-between group">
-            <div class="space-y-1">
+          <button onclick="selectGameMode('murder_mystery')" class="w-full text-left p-5 rounded-2xl card-interactive flex items-center justify-between group cursor-pointer">
+            <div class="space-y-1 pr-4">
               <div class="flex items-center gap-2">
                 <span class="text-xl">🏰</span>
                 <h3 class="text-xl font-bold text-white group-hover:text-blue-400 transition-colors">Murder Mystery</h3>
               </div>
               <p class="text-xs text-slate-400 max-w-xs leading-relaxed">
-                Roles: Murderer, Detective, Manor Guest. Features 3-min discussion, night kills, and ballot votes.
+                Roles: Murderer and Manor Guest. Features 3-min discussion, night kills, and ballot votes.
               </p>
             </div>
-            <span class="px-3.5 py-1.5 bg-indigo-600/90 text-white text-xs font-semibold rounded-full shadow-md whitespace-nowrap">
+            <span class="px-4 py-1.5 ${isMystery ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-400'} text-xs font-bold rounded-full shadow-md whitespace-nowrap">
               Mystery
             </span>
           </button>
 
-          <!-- Classic Mafia Card -->
-          <button onclick="selectGameMode('mafia')" class="w-full text-left p-5 rounded-2xl card-interactive flex items-center justify-between group">
-            <div class="space-y-1">
+          <button onclick="selectGameMode('mafia')" class="w-full text-left p-5 rounded-2xl card-interactive flex items-center justify-between group cursor-pointer">
+            <div class="space-y-1 pr-4">
               <div class="flex items-center gap-2">
                 <span class="text-xl">🕵️</span>
                 <h3 class="text-xl font-bold text-white group-hover:text-blue-400 transition-colors">Classic Mafia</h3>
@@ -438,17 +352,16 @@
                 Roles: Mafia and Civilian. Features continuous 5-minute discussion timers alternating with voting ballots.
               </p>
             </div>
-            <span class="px-3.5 py-1.5 bg-slate-800 border border-slate-600/80 text-slate-300 text-xs font-semibold rounded-full whitespace-nowrap">
+            <span class="px-4 py-1.5 ${!isMystery ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-400'} text-xs font-bold rounded-full shadow-md whitespace-nowrap">
               Classic
             </span>
           </button>
 
-          <!-- Net Mode Toggle -->
           <div class="flex items-center justify-between w-full px-2 pt-2 border-t border-slate-800/80 mt-2">
             <span class="text-xs text-slate-400 font-semibold">Networking Style:</span>
             <div class="flex gap-2">
-              <button onclick="setNetMode('pass_phone')" class="px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${G.netMode === 'pass_phone' ? 'bg-blue-600 border-blue-400 text-white' : 'bg-slate-900 border-slate-700 text-slate-400'}">Pass-The-Phone</button>
-              <button onclick="setNetMode('online')" class="px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${G.netMode === 'online' ? 'bg-blue-600 border-blue-400 text-white' : 'bg-slate-900 border-slate-700 text-slate-400'}">Online Party</button>
+              <button onclick="setNetMode('pass_phone')" class="px-3.5 py-1.5 rounded-full text-xs font-bold transition-all ${isPassPhone ? 'bg-blue-600 text-white shadow-md' : 'bg-slate-800 text-slate-400'} cursor-pointer">Pass-The-Phone</button>
+              <button onclick="setNetMode('online')" class="px-3.5 py-1.5 rounded-full text-xs font-bold transition-all ${!isPassPhone ? 'bg-blue-600 text-white shadow-md' : 'bg-slate-800 text-slate-400'} cursor-pointer">Online Party</button>
             </div>
           </div>
         </div>
@@ -458,7 +371,7 @@
     function selectGameMode(mode) {
       sfx.click();
       G.mode = mode;
-      G.discussionTimeLeft = mode === 'murder_mystery' ? 180 : 300; // 3 mins vs 5 mins
+      G.discussionTimeLeft = mode === 'mafia' ? 300 : 180;
       G.phase = 'lobby';
       renderState();
     }
@@ -469,20 +382,20 @@
       renderState();
     }
 
-    // --- SCREEN 2: LOBBY ---
     function renderLobby() {
-      const isMM = G.mode === 'murder_mystery';
-
       const settingsHTML = `
-        <div class="w-full bg-slate-950/60 border border-slate-800 rounded-2xl p-4 space-y-4">
+        <div class="w-full bg-slate-950/60 border border-slate-800 rounded-2xl p-4 space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-slate-300 uppercase tracking-wider">Active Rulebook</span>
+            <button onclick="G.mode = G.mode === 'mafia' ? 'murder_mystery' : 'mafia'; renderState();" class="px-3 py-1 bg-indigo-950 border border-indigo-500/40 text-indigo-300 text-xs font-bold rounded-full cursor-pointer">
+              Switch to ${G.mode === 'mafia' ? 'Murder Mystery' : 'Classic Mafia'}
+            </button>
+          </div>
           <div>
-            <div class="flex items-center justify-between mb-2">
-              <label class="text-xs font-bold text-slate-300 uppercase tracking-wider block">${isMM ? 'Murderer' : 'Mafia'} Count</label>
-              <span class="text-[10px] text-slate-400 font-medium">Auto scales with player count</span>
-            </div>
+            <span class="text-xs font-bold text-slate-300 uppercase tracking-wider block mb-1.5">${G.mode === 'mafia' ? 'Mafia Count' : 'Murderer Count'}</span>
             <div class="grid grid-cols-4 gap-2">
               ${['auto', 1, 2, 3].map(c => `
-                <button onclick="setImposterCount('${c}')" class="py-2 px-2 rounded-xl border font-bold text-xs transition-all ${String(G.imposterCountMode) === String(c) ? 'bg-blue-600 border-blue-400 text-white shadow-md' : 'bg-slate-900 border-slate-700 text-slate-400 hover:text-white'}">
+                <button onclick="setImposterCount('${c}')" class="py-2 px-2 rounded-xl border font-bold text-xs transition-all ${String(G.imposterCountMode) === String(c) ? 'bg-blue-600 border-blue-400 text-white shadow-md' : 'bg-slate-900 border-slate-700 text-slate-400 hover:text-white'} cursor-pointer">
                   ${c === 'auto' ? 'Auto' : c}
                 </button>
               `).join('')}
@@ -495,43 +408,32 @@
         return `
           <div class="flex flex-col items-center w-full space-y-4">
             ${settingsHTML}
-
             <div class="w-full space-y-2 text-left">
-              <label class="text-xs font-bold text-slate-300 uppercase tracking-wider block">Add Players</label>
+              <label class="text-xs font-bold text-slate-300 uppercase tracking-wider block">Add Players (Min 3)</label>
               <div class="flex gap-2 w-full">
                 <input type="text" id="playerNameInput" placeholder="Enter player name..." class="flex-1 bg-slate-900/80 border border-slate-700/80 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-500 text-white placeholder-slate-500">
-                <button onclick="addPassPlayer()" class="bg-blue-600 hover:bg-blue-500 text-white font-bold px-6 py-3 rounded-xl transition-all shadow-md">
-                  Add
-                </button>
+                <button onclick="addPassPlayer()" class="bg-blue-600 hover:bg-blue-500 text-white font-bold px-6 py-3 rounded-xl transition-all shadow-md cursor-pointer">Add</button>
               </div>
             </div>
-
-            <!-- Player List -->
-            <div class="w-full bg-slate-950/40 border border-slate-800 rounded-2xl p-4 max-h-40 overflow-y-auto space-y-2">
+            <div class="w-full bg-slate-950/40 border border-slate-800 rounded-2xl p-4 max-h-36 overflow-y-auto space-y-2">
               ${G.players.length === 0 ? `<div class="text-xs text-center text-slate-500 py-4">No players added yet. Add at least 3 players.</div>` : ''}
               ${G.players.map((p, i) => `
                 <div class="flex items-center justify-between bg-slate-900/90 border border-slate-800 rounded-xl px-4 py-2.5 text-sm">
                   <span class="font-semibold text-slate-200">${i+1}. ${p.name}</span>
-                  <button onclick="removePlayer(${i})" class="text-red-400 hover:text-red-300 text-xs font-bold px-2 py-1">Remove</button>
+                  <button onclick="removePlayer(${i})" class="text-red-400 hover:text-red-300 text-xs font-bold px-2 py-1 cursor-pointer">Remove</button>
                 </div>
               `).join('')}
             </div>
-
             <div class="flex gap-3 w-full pt-2">
-              <button onclick="G.phase='mode_select'; renderState();" class="w-1/3 py-3.5 bg-slate-800/80 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-sm transition-all">
-                Back
-              </button>
-              <button onclick="startGame()" ${G.players.length < 3 ? 'disabled class="w-2/3 py-3.5 bg-slate-800 text-slate-500 font-bold rounded-xl text-sm cursor-not-allowed"' : 'class="w-2/3 py-3.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-sm shadow-lg glow-blue transition-all"'}>
-                Start Game (${G.players.length})
-              </button>
+              <button onclick="G.phase='mode_select'; renderState();" class="w-1/3 py-3.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-sm transition-all cursor-pointer">Back</button>
+              <button onclick="startGame()" ${G.players.length < 3 ? 'disabled class="w-2/3 py-3.5 bg-slate-800 text-slate-500 font-bold rounded-xl text-sm cursor-not-allowed"' : 'class="w-2/3 py-3.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-sm shadow-lg glow-blue transition-all cursor-pointer"'}>Start Game (${G.players.length})</button>
             </div>
           </div>
         `;
       } else {
         return `
           <div class="flex flex-col items-center w-full space-y-4">
-            ${G.isHost ? settingsHTML : ''}
-
+            ${settingsHTML}
             ${G.roomCode ? `
               <div class="bg-slate-950/80 border border-indigo-500/40 p-3.5 rounded-2xl text-center w-full">
                 <span class="text-xs text-slate-400 uppercase tracking-widest block mb-0.5">Room Code</span>
@@ -541,14 +443,12 @@
               <div class="w-full space-y-3">
                 <input type="text" id="handleInput" placeholder="Your Handle..." class="w-full bg-slate-900/80 border border-slate-700/80 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-500 text-white">
                 <div class="grid grid-cols-2 gap-3">
-                  <button onclick="createOnlineRoom()" class="py-3.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-sm transition-all">Create Room</button>
-                  <button onclick="joinOnlineRoomPrompt()" class="py-3.5 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl text-sm transition-all">Join Room</button>
+                  <button onclick="createOnlineRoom()" class="py-3.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-sm transition-all cursor-pointer">Create Room</button>
+                  <button onclick="joinOnlineRoomPrompt()" class="py-3.5 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl text-sm transition-all cursor-pointer">Join Room</button>
                 </div>
               </div>
             `}
-
-            <!-- Player List -->
-            <div class="w-full bg-slate-950/40 border border-slate-800 rounded-2xl p-4 max-h-40 overflow-y-auto space-y-2">
+            <div class="w-full bg-slate-950/40 border border-slate-800 rounded-2xl p-4 max-h-36 overflow-y-auto space-y-2">
               <span class="text-xs text-slate-400 font-bold uppercase tracking-wider block mb-2">Connected Players</span>
               ${G.players.map(p => `
                 <div class="flex items-center justify-between bg-slate-900/90 border border-slate-800 rounded-xl px-4 py-2 text-sm">
@@ -557,16 +457,10 @@
                 </div>
               `).join('')}
             </div>
-
             ${G.isHost && G.roomCode ? `
-              <button onclick="startGame()" ${G.players.length < 3 ? 'disabled class="w-full py-3.5 bg-slate-800 text-slate-500 font-bold rounded-xl text-sm cursor-not-allowed"' : 'class="w-full py-3.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-sm shadow-lg glow-blue transition-all"'}>
-                Start Multi-Device Game
-              </button>
+              <button onclick="startGame()" ${G.players.length < 3 ? 'disabled class="w-full py-3.5 bg-slate-800 text-slate-500 font-bold rounded-xl text-sm cursor-not-allowed"' : 'class="w-full py-3.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-sm shadow-lg glow-blue transition-all cursor-pointer"'}>Start Multi-Device Game</button>
             ` : ''}
-
-            <button onclick="G.phase='mode_select'; renderState();" class="text-xs text-slate-400 hover:text-white transition-colors pt-1">
-              &larr; Back to Main Screen
-            </button>
+            <button onclick="G.phase='mode_select'; renderState();" class="text-xs text-slate-400 hover:text-white transition-colors pt-1 cursor-pointer">&larr; Back to Main Screen</button>
           </div>
         `;
       }
@@ -600,7 +494,6 @@
       G.myPlayerId = 'p_' + Math.random().toString(36).substr(2, 9);
       G.isHost = true;
       G.players = [{ id: G.myPlayerId, name: name, role: '', alive: true }];
-
       await initPeer('imposter_room_' + G.roomCode);
       renderState();
     }
@@ -611,23 +504,21 @@
       const handleInput = document.getElementById('handleInput');
       const name = handleInput && handleInput.value.trim() ? handleInput.value.trim() : 'Player';
       sfx.click();
-
       G.roomCode = code.toUpperCase();
       G.myPlayerId = 'p_' + Math.random().toString(36).substr(2, 9);
       G.isHost = false;
-
-      const myId = await initPeer();
+      await initPeer();
       const hostPeerId = 'imposter_room_' + G.roomCode;
-      const conn = peer.connect(hostPeerId);
-
-      conn.on('open', () => {
-        conn.send({
-          type: 'JOIN_REQUEST',
-          player: { id: G.myPlayerId, name: name, role: '', alive: true }
+      try {
+        const conn = peer.connect(hostPeerId);
+        conn.on('open', () => {
+          conn.send({
+            type: 'JOIN_REQUEST',
+            player: { id: G.myPlayerId, name: name, role: '', alive: true }
+          });
         });
-      });
-
-      conn.on('data', (data) => handleIncomingData(data));
+        conn.on('data', (data) => handleIncomingData(data));
+      } catch (err) {}
       renderState();
     }
 
@@ -649,79 +540,62 @@
       else renderState();
     }
 
-    // --- SCREEN 3: ROLE REVEAL ---
     function renderReveal() {
       const p = G.players[G.currentRevealIdx];
-      const isMM = G.mode === 'murder_mystery';
+      const isMafiaMode = G.mode === 'mafia';
 
       let roleTitle = '';
       let roleDesc = '';
       let isBad = false;
 
-      if (isMM) {
-        if (p.role === 'murderer') {
-          roleTitle = 'MURDERER';
-          roleDesc = 'Eliminate all manor guests in secret without getting caught!';
-          isBad = true;
-        } else if (p.role === 'detective') {
-          roleTitle = 'DETECTIVE';
-          roleDesc = 'Investigate suspicious activity and lead the crew to truth!';
-        } else {
-          roleTitle = 'MANOR GUEST';
-          roleDesc = 'Deduce who the murderer is and survive the nights!';
-        }
-      } else {
+      if (isMafiaMode) {
         if (p.role === 'mafia') {
           roleTitle = 'MAFIA';
-          roleDesc = 'Blend in with civilians and eliminate them during voting!';
+          roleDesc = 'Secretly eliminate players each night and deceive the group during debates!';
           isBad = true;
         } else {
           roleTitle = 'CIVILIAN';
-          roleDesc = 'Find and vote out the mafia members before they outnumber you!';
+          roleDesc = 'Identify suspicious patterns, defend yourself, and vote out the Mafia!';
+        }
+      } else {
+        if (p.role === 'murderer') {
+          roleTitle = 'MURDERER';
+          roleDesc = 'Secretly choose victims each night and cover your tracks during manor investigations!';
+          isBad = true;
+        } else {
+          roleTitle = 'MANOR GUEST';
+          roleDesc = 'Examine clues, analyze alibis, and find out who committed the murder!';
         }
       }
 
       const partners = G.players
-        .filter(x => x.id !== p.id && (x.role === 'murderer' || x.role === 'mafia'))
+        .filter(x => x.id !== p.id && (x.role === 'mafia' || x.role === 'murderer'))
         .map(x => x.name);
 
       return `
         <div class="flex flex-col items-center text-center space-y-6 w-full">
           <div class="w-full bg-slate-950/60 border border-slate-800 rounded-3xl p-6 flex flex-col items-center">
-            <div class="w-16 h-16 rounded-full bg-blue-950/50 border border-blue-500/30 flex items-center justify-center mb-3 text-blue-400">
-              <svg class="w-8 h-8" viewBox="0 0 100 100" fill="none" stroke="currentColor">
-                <rect x="20" y="30" width="60" height="40" rx="4" stroke-width="2.5"/>
-                <path d="M20 30 L50 52 L80 30" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
-            </div>
             <span class="text-xs text-slate-400 uppercase tracking-widest font-bold">PASS PHONE TO</span>
             <h2 class="text-3xl font-extrabold text-white mt-1">${p.name}</h2>
+            <p class="text-xs text-slate-400 mt-2">Beta Squad Rule: Keep your secret card hidden!</p>
           </div>
 
           ${!G.showCardModal ? `
-            <button onclick="G.showCardModal=true; sfx.click(); renderState();" class="w-full py-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-extrabold text-base rounded-2xl shadow-xl hover:opacity-95 transition-all glow-blue">
+            <button onclick="G.showCardModal=true; sfx.click(); renderState();" class="w-full py-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-extrabold text-base rounded-2xl shadow-xl hover:opacity-95 transition-all glow-blue cursor-pointer">
               VIEW SECRET ROLE CARD
             </button>
           ` : `
-            <div class="w-full bg-slate-950/80 border ${isBad ? 'border-red-500/50' : 'border-emerald-500/50'} rounded-3xl p-6 flex flex-col items-center animate-pulse-slow">
+            <div class="w-full bg-slate-950/80 border ${isBad ? 'border-red-500/50' : 'border-emerald-500/50'} rounded-3xl p-6 flex flex-col items-center">
               <span class="text-xs font-bold uppercase tracking-widest text-slate-400 mb-1">YOUR SECRET ROLE</span>
-              <h3 class="text-3xl font-black ${isBad ? 'text-red-400' : 'text-emerald-400'} mb-2">
-                ${roleTitle}
-              </h3>
+              <h3 class="text-3xl font-black ${isBad ? 'text-red-400' : 'text-emerald-400'} mb-2">${roleTitle}</h3>
               <p class="text-xs text-slate-300 max-w-xs mb-4 leading-relaxed">${roleDesc}</p>
-
-              ${isBad ? `
+              ${isBad && partners.length > 0 ? `
                 <div class="w-full bg-slate-900/90 border border-red-900/40 rounded-xl p-3 mb-4">
-                  <span class="text-xs text-red-400 font-bold block">FELLOW PARTNERS:</span>
-                  <span class="text-sm font-semibold text-white">
-                    ${partners.length > 0 ? partners.join(', ') : 'None (Working alone)'}
-                  </span>
+                  <span class="text-xs text-red-400 font-bold block">PARTNERS IN CRIME:</span>
+                  <span class="text-sm font-semibold text-white">${partners.join(', ')}</span>
                 </div>
               ` : ''}
-
-              <button onclick="nextReveal()" class="w-full py-3 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl text-sm transition-all">
-                Hide Card & Pass Phone
-              </button>
+              <button onclick="nextReveal()" class="w-full py-3 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl text-sm transition-all cursor-pointer">Hide Card & Pass Phone</button>
             </div>
           `}
         </div>
@@ -739,14 +613,12 @@
       }
     }
 
-    // --- SCREEN 4: DISCUSSION ---
     function startDiscussion() {
       G.phase = 'discussion';
-      G.discussionTimeLeft = G.mode === 'murder_mystery' ? 180 : 300; // 3 min MM, 5 min Mafia
+      G.discussionTimeLeft = G.mode === 'mafia' ? 300 : 180;
       G.currentPrompt = getRandomPrompt();
       if (G.netMode === 'online') broadcastState();
       else renderState();
-
       startDiscussionTimer();
     }
 
@@ -780,23 +652,21 @@
           <div class="relative w-24 h-24 rounded-full bg-slate-950 border-2 border-indigo-500/50 flex flex-col items-center justify-center glow-indigo">
             <span id="timerMinutes" class="text-2xl font-black text-indigo-400 tracking-wider">${m}:${s < 10 ? '0' : ''}${s}</span>
           </div>
-
           <div>
-            <h2 class="text-2xl font-black text-white">${G.mode === 'murder_mystery' ? 'MANOR INTERROGATION' : 'TOWN DISCUSSION'}</h2>
-            <p class="text-xs text-slate-400 mt-1 max-w-sm">Discuss suspicions and formulate arguments before the phase ends.</p>
+            <div class="inline-block px-3 py-1 bg-indigo-950 border border-indigo-500/30 text-indigo-300 text-[10px] font-bold uppercase rounded-full mb-1">
+              Round ${G.roundCount} • Debate & Accusations
+            </div>
+            <h2 class="text-2xl font-black text-white">${G.mode === 'mafia' ? '5-MINUTE DEBATE' : '3-MINUTE MANOR INVESTIGATION'}</h2>
           </div>
-
-          <!-- Dynamic Interrogation Prompt Card with Shuffle Button -->
           <div class="w-full bg-indigo-950/40 border border-indigo-500/30 rounded-2xl p-4 text-left space-y-1">
             <div class="flex items-center justify-between">
-              <span class="text-[10px] text-indigo-400 font-bold uppercase tracking-wider">Interrogation Prompt</span>
-              <button onclick="shufflePrompt()" class="text-[10px] text-indigo-300 hover:text-white underline font-semibold">Shuffle Prompt</button>
+              <span class="text-[10px] text-indigo-400 font-bold uppercase tracking-wider">Beta Squad Interrogation Prompt</span>
+              <button onclick="shufflePrompt()" class="text-[10px] text-indigo-300 hover:text-white underline font-semibold cursor-pointer">Shuffle Prompt</button>
             </div>
             <p id="interrogationPromptText" class="text-sm font-bold text-white">${G.currentPrompt}</p>
           </div>
-
-          <div class="w-full bg-slate-950/40 border border-slate-800 rounded-2xl p-4 max-h-36 overflow-y-auto space-y-2">
-            <span class="text-xs text-slate-400 font-bold uppercase tracking-wider block mb-1">Surviving Crew</span>
+          <div class="w-full bg-slate-950/40 border border-slate-800 rounded-2xl p-4 max-h-32 overflow-y-auto space-y-2">
+            <span class="text-xs text-slate-400 font-bold uppercase tracking-wider block mb-1">Living Players</span>
             <div class="grid grid-cols-2 gap-2">
               ${G.players.map(p => `
                 <div class="flex items-center gap-2 p-2 rounded-xl ${p.alive ? 'bg-slate-900 border border-slate-800 text-slate-200' : 'bg-red-950/30 border border-red-900/40 text-red-500/60 line-through'} text-xs font-semibold">
@@ -806,9 +676,8 @@
               `).join('')}
             </div>
           </div>
-
-          <button onclick="skipDiscussionTimer()" class="w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold text-sm rounded-xl transition-all shadow-lg glow-indigo">
-            END DISCUSSION EARLY &rarr;
+          <button onclick="skipDiscussionTimer()" class="w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold text-sm rounded-xl transition-all shadow-lg glow-indigo cursor-pointer">
+            PROCEED TO ${G.mode === 'mafia' ? 'VOTING' : 'NIGHT PHASE'} &rarr;
           </button>
         </div>
       `;
@@ -829,124 +698,91 @@
     }
 
     function handleDiscussionEnd() {
-      if (G.mode === 'murder_mystery') {
-        goNightApproach();
-      } else {
+      if (G.mode === 'mafia') {
         goVoteBallot();
+      } else {
+        goToNightApproaching();
       }
     }
 
-    // --- MURDER MYSTERY NIGHT PHASES ---
-    function goNightApproach() {
-      G.phase = 'night_approach';
+    function goToNightApproaching() {
+      G.phase = 'night_approaching';
       if (G.netMode === 'online') broadcastState();
       else renderState();
       sfx.elim();
-      playVoiceCommand("Night is approaching. One manor guest will be killed. Guests, close your eyes!", "Fenrir");
     }
 
-    function renderNightApproach() {
-      return `
-        <div class="flex flex-col items-center text-center space-y-6 w-full animate-pulse-slow">
-          <div class="w-24 h-24 rounded-full bg-slate-950 border-2 border-red-500/60 flex items-center justify-center text-red-400 shadow-xl">
-            <span class="text-4xl">🌙</span>
-          </div>
-
-          <div>
-            <h2 class="text-3xl font-black text-red-400">NIGHT IS APPROACHING</h2>
-            <p class="text-sm text-slate-300 mt-2 max-w-sm">One manor guest will be eliminated in the dark.</p>
-          </div>
-
-          <div class="bg-red-950/40 border border-red-800/40 p-4 rounded-2xl w-full">
-            <span class="text-xs text-red-300 font-bold tracking-wider uppercase">ANNOUNCEMENT</span>
-            <p class="text-slate-200 text-sm mt-1 font-semibold">"Guests, close your eyes!"</p>
-          </div>
-
-          <button onclick="goGuestsCloseEyes()" class="w-full py-4 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl text-sm transition-all">
-            Continue &rarr;
-          </button>
-        </div>
-      `;
-    }
-
-    function goGuestsCloseEyes() {
-      G.phase = 'guests_close_eyes';
-      if (G.netMode === 'online') broadcastState();
-      else renderState();
-      sfx.click();
-    }
-
-    function renderGuestsCloseEyes() {
+    function renderNightApproaching() {
       return `
         <div class="flex flex-col items-center text-center space-y-6 w-full">
-          <div class="w-24 h-24 rounded-full bg-slate-950 border border-slate-800 flex items-center justify-center text-slate-400">
-            <span class="text-4xl">🙈</span>
+          <div class="w-20 h-20 rounded-full bg-slate-950 border-2 border-indigo-500/60 flex items-center justify-center text-indigo-400 shadow-xl">
+            <span class="text-3xl">🌙</span>
           </div>
-
           <div>
-            <h2 class="text-2xl font-black text-slate-300">ALL GUESTS CLOSE YOUR EYES</h2>
-            <p class="text-xs text-slate-400 mt-1">Ensure everyone has closed their eyes and covered their ears.</p>
+            <h2 class="text-2xl font-black text-indigo-400">NIGHT PHASE — ROUND ${G.roundCount}</h2>
+            <p class="text-xs text-slate-300 mt-1">Night is approaching. One manor guest will be eliminated. Guests, close your eyes!</p>
           </div>
-
-          <button onclick="goMurderersOpenEyes()" class="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-sm rounded-xl transition-all shadow-lg glow-blue">
-            MURDERERS OPEN EYES &rarr;
+          <button onclick="goToOpenEyes()" class="w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold text-sm rounded-xl shadow-lg glow-indigo transition-all cursor-pointer">
+            Open Murderer's Eyes &rarr;
           </button>
         </div>
       `;
     }
 
-    function goMurderersOpenEyes() {
+    function goToOpenEyes() {
+      sfx.click();
       G.phase = 'murderers_open_eyes';
-      G.nightTargetId = null;
+      G.murdererTargetId = null;
       if (G.netMode === 'online') broadcastState();
       else renderState();
-      sfx.click();
-      playVoiceCommand("Murderers, open your eyes. Select your victim in secret.", "Kore");
     }
 
     function renderMurderersOpenEyes() {
-      const livingGuests = G.players.filter(p => p.alive && p.role !== 'murderer');
-
+      const targets = G.players.filter(p => p.alive && p.role !== 'murderer');
       return `
         <div class="flex flex-col items-center text-center space-y-6 w-full">
-          <div>
-            <h2 class="text-2xl font-black text-red-400">MURDERERS, OPEN YOUR EYES</h2>
-            <p class="text-xs text-slate-400 mt-1">Secretly choose one innocent manor guest to eliminate tonight.</p>
+          <div class="w-20 h-20 rounded-full bg-slate-950 border-2 border-red-500/60 flex items-center justify-center text-red-400 shadow-xl">
+            <span class="text-3xl">🔪</span>
           </div>
-
-          <div class="w-full space-y-2 max-h-56 overflow-y-auto">
-            ${livingGuests.map(p => `
-              <button onclick="selectNightTarget('${p.id}')" class="w-full p-4 ${G.nightTargetId === p.id ? 'bg-red-600 border-red-400 text-white' : 'bg-slate-900 hover:bg-slate-800 border-slate-700 text-slate-200'} border rounded-2xl flex items-center justify-between font-bold text-sm transition-all">
+          <div>
+            <h2 class="text-2xl font-black text-red-400">MURDERER OPENS EYES</h2>
+            <p class="text-xs text-slate-300 mt-1">Pass the phone privately to select who will be eliminated tonight.</p>
+          </div>
+          <div class="w-full space-y-2 max-h-48 overflow-y-auto">
+            ${targets.map(p => `
+              <button onclick="selectNightTarget('${p.id}')" class="w-full p-3.5 ${G.murdererTargetId === p.id ? 'bg-red-600 border-red-400 text-white' : 'bg-slate-900 hover:bg-slate-800 border-slate-700 text-slate-200'} border rounded-xl flex items-center justify-between font-bold text-sm transition-all cursor-pointer">
                 <span>${p.name}</span>
-                ${G.nightTargetId === p.id ? '<span class="text-xs uppercase tracking-widest bg-black/40 px-2.5 py-1 rounded-full">Targeted</span>' : ''}
+                ${G.murdererTargetId === p.id ? '<span class="text-xs uppercase tracking-widest bg-black/40 px-2 py-0.5 rounded-full">Selected Victim</span>' : ''}
               </button>
             `).join('')}
           </div>
-
-          <button onclick="confirmNightKill()" ${!G.nightTargetId ? 'disabled class="w-full py-4 bg-slate-800 text-slate-500 font-bold rounded-xl text-sm cursor-not-allowed"' : 'class="w-full py-4 bg-red-600 hover:bg-red-500 text-white font-extrabold text-sm rounded-xl shadow-lg glow-blue transition-all"'}>
-            CONFIRM KILL STRIKE
+          <button onclick="concludeNightPhase()" ${!G.murdererTargetId ? 'disabled class="w-full py-3.5 bg-slate-800 text-slate-500 font-bold rounded-xl text-sm cursor-not-allowed"' : 'class="w-full py-3.5 bg-red-600 hover:bg-red-500 text-white font-extrabold text-sm rounded-xl shadow-lg glow-blue transition-all cursor-pointer"'}>
+            Confirm Night Elimination &rarr;
           </button>
         </div>
       `;
     }
 
-    function selectNightTarget(targetId) {
+    function selectNightTarget(id) {
       sfx.click();
-      G.nightTargetId = targetId;
+      G.murdererTargetId = id;
       renderState();
     }
 
-    function confirmNightKill() {
-      if (!G.nightTargetId) return;
+    function concludeNightPhase() {
       sfx.elim();
-
-      const victim = G.players.find(p => p.id === G.nightTargetId);
-      if (victim) {
-        victim.alive = false;
-        G.lastKilledPlayer = victim;
+      if (G.murdererTargetId) {
+        const victim = G.players.find(p => p.id === G.murdererTargetId);
+        if (victim) {
+          victim.alive = false;
+          G.lastEliminatedPlayer = victim;
+          G.lastEliminatedForfeit = getRandomForfeit();
+        }
       }
 
-      if (checkWinConditions()) return;
+      // Do NOT check win conditions before morning votes; proceed to morning break so players can discuss & vote!
+      // Increment round count when moving to morning break
+      G.roundCount++;
 
       G.phase = 'morning_break';
       if (G.netMode === 'online') broadcastState();
@@ -957,25 +793,32 @@
       return `
         <div class="flex flex-col items-center text-center space-y-6 w-full">
           <div>
-            <h2 class="text-3xl font-black text-amber-400">MORNING BREAKS</h2>
-            <p class="text-xs text-slate-400 mt-1">Everyone open your eyes!</p>
+            <div class="inline-flex items-center gap-2 px-4 py-1.5 bg-amber-950/70 border border-amber-500/30 rounded-full text-amber-300 text-xs font-bold tracking-widest uppercase mb-3 shadow-inner">
+              SUNRISE BREAK • ROUND ${G.roundCount - 1}
+            </div>
+            <h2 class="text-3xl font-black text-amber-400">NIGHT CASUALTY REPORT</h2>
           </div>
-
-          <div class="w-full bg-red-950/40 border border-red-800/60 p-5 rounded-2xl flex flex-col items-center">
-            <span class="text-xs text-red-400 font-bold tracking-widest uppercase mb-1">TRAGEDY AT NIGHT</span>
-            <span class="text-2xl font-black text-white">${G.lastKilledPlayer ? G.lastKilledPlayer.name : 'No one'}</span>
-            <span class="text-xs text-red-300/80 mt-1">was found dead in the manor!</span>
+          <div class="w-full bg-slate-950/60 border border-slate-800 p-5 rounded-2xl flex flex-col items-center space-y-3">
+            <span class="text-xs text-slate-400 font-bold uppercase tracking-widest">ELIMINATED OVERNIGHT</span>
+            ${G.lastEliminatedPlayer ? `
+              <span class="text-xl font-black text-red-400">${G.lastEliminatedPlayer.name} was eliminated!</span>
+              <div class="w-full bg-slate-900 border border-red-900/40 p-3 rounded-xl text-left">
+                <span class="text-[10px] text-red-400 font-bold uppercase tracking-widest block mb-0.5">Beta Squad Game Forfeit:</span>
+                <p class="text-xs font-semibold text-slate-200">${G.lastEliminatedForfeit}</p>
+              </div>
+            ` : `
+              <span class="text-xl font-black text-slate-300">A peaceful night. No one was killed.</span>
+            `}
           </div>
-
-          <button onclick="goVoteBallot()" class="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-sm rounded-xl transition-all shadow-lg glow-blue">
-            PROCEED TO VOTE BALLOT &rarr;
+          <button onclick="goVoteBallot()" class="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-sm rounded-xl transition-all shadow-lg glow-blue cursor-pointer">
+            PROCEED TO GROUP VOTE &rarr;
           </button>
         </div>
       `;
     }
 
-    // --- VOTE BALLOT (Shared for Murder Mystery & Mafia) ---
     function goVoteBallot() {
+      if (checkWinConditions()) return;
       G.phase = 'vote_ballot';
       G.currentVoterIdx = 0;
       G.votes = {};
@@ -997,15 +840,14 @@
         <div class="flex flex-col items-center text-center space-y-6 w-full">
           <div>
             <div class="inline-block px-3.5 py-1 bg-indigo-950 border border-indigo-500/40 text-indigo-300 text-xs font-bold uppercase rounded-full mb-2">
-              VOTE BALLOT (${G.currentVoterIdx + 1}/${livingPlayers.length})
+              VOTING BALLOT (${G.currentVoterIdx + 1}/${livingPlayers.length})
             </div>
-            <h2 class="text-2xl font-black text-white">${currentVoter.name}'S SECRET VOTE</h2>
-            <p class="text-xs text-slate-400 mt-1">Select one suspect to cast your vote for elimination.</p>
+            <h2 class="text-2xl font-black text-white">${currentVoter.name}'S VOTE</h2>
+            <p class="text-xs text-slate-400 mt-1">Cast your vote to eliminate a suspect from the group.</p>
           </div>
-
-          <div class="w-full space-y-2 max-h-52 overflow-y-auto">
+          <div class="w-full space-y-2 max-h-48 overflow-y-auto">
             ${livingPlayers.filter(p => p.id !== currentVoter.id).map(p => `
-              <button onclick="castBallot('${currentVoter.id}', '${p.id}')" class="w-full p-3.5 bg-slate-900 hover:bg-slate-800 border border-slate-700/80 rounded-xl flex items-center justify-between font-bold text-sm text-slate-200 transition-all">
+              <button onclick="castBallot('${currentVoter.id}', '${p.id}')" class="w-full p-3.5 bg-slate-900 hover:bg-slate-800 border border-slate-700/80 rounded-xl flex items-center justify-between font-bold text-sm text-slate-200 transition-all cursor-pointer">
                 <span>${p.name}</span>
                 <span class="text-xs text-blue-400">Vote &rarr;</span>
               </button>
@@ -1018,7 +860,6 @@
     function castBallot(voterId, targetId) {
       sfx.click();
       G.votes[voterId] = targetId;
-
       const livingPlayers = G.players.filter(p => p.alive);
       if (G.currentVoterIdx + 1 < livingPlayers.length) {
         G.currentVoterIdx++;
@@ -1052,10 +893,11 @@
         const p = G.players.find(x => x.id === eliminatedId);
         if (p) {
           p.alive = false;
-          G.lastKilledPlayer = p;
+          G.lastEliminatedPlayer = p;
+          G.lastEliminatedForfeit = getRandomForfeit();
         }
       } else {
-        G.lastKilledPlayer = null;
+        G.lastEliminatedPlayer = null;
       }
 
       if (checkWinConditions()) return;
@@ -1069,88 +911,90 @@
       return `
         <div class="flex flex-col items-center text-center space-y-6 w-full">
           <div>
-            <h2 class="text-3xl font-black text-white">BALLOT TALLY RESULTS</h2>
-            <p class="text-xs text-slate-400 mt-1">The crew members have spoken!</p>
+            <h2 class="text-3xl font-black text-white">VOTING RESULTS</h2>
           </div>
-
-          ${G.lastKilledPlayer ? `
-            <div class="w-full bg-red-950/40 border border-red-800/60 p-5 rounded-2xl flex flex-col items-center">
-              <span class="text-xs text-red-400 font-bold uppercase tracking-widest mb-1">ELIMINATED BY BALLOT</span>
-              <span class="text-2xl font-black text-white">${G.lastKilledPlayer.name}</span>
-              <span class="text-xs text-slate-300 mt-2">Their true identity was: <strong class="text-red-400 uppercase">${G.lastKilledPlayer.role.replace('_', ' ')}</strong></span>
+          ${G.lastEliminatedPlayer ? `
+            <div class="w-full bg-red-950/40 border border-red-800/60 p-5 rounded-2xl flex flex-col items-center space-y-3">
+              <span class="text-xs text-red-400 font-bold uppercase tracking-widest">ELIMINATED BY GROUP VOTE</span>
+              <span class="text-2xl font-black text-white">${G.lastEliminatedPlayer.name}</span>
+              <span class="text-xs text-slate-300">True identity: <strong class="text-red-400 uppercase">${G.lastEliminatedPlayer.role.replace('_', ' ')}</strong></span>
+              <div class="w-full bg-slate-900 border border-red-900/40 p-3 rounded-xl text-left mt-2">
+                <span class="text-[10px] text-red-400 font-bold uppercase tracking-widest block mb-0.5">Beta Squad Game Forfeit:</span>
+                <p class="text-xs font-semibold text-slate-200">${G.lastEliminatedForfeit}</p>
+              </div>
             </div>
           ` : `
             <div class="w-full bg-slate-900/90 border border-slate-700/80 p-5 rounded-2xl">
-              <span class="text-base font-bold text-amber-400">TIE VOTE DETECTED!</span>
-              <p class="text-xs text-slate-400 mt-1">No player was eliminated by ballot today.</p>
+              <span class="text-base font-bold text-amber-400">TIE VOTE!</span>
+              <p class="text-xs text-slate-400 mt-1">No one was eliminated due to a tied vote.</p>
             </div>
           `}
-
-          <button onclick="startDiscussion()" class="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-sm rounded-xl transition-all shadow-lg glow-blue">
-            ${G.mode === 'murder_mystery' ? 'START NEXT 3-MIN DISCUSSION &rarr;' : 'START NEXT 5-MIN DISCUSSION &rarr;'}
+          <button onclick="advanceRound()" class="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-sm rounded-xl transition-all shadow-lg glow-blue cursor-pointer">
+            START ROUND ${G.roundCount} ${G.mode === 'mafia' ? 'DEBATE' : 'INVESTIGATION'} &rarr;
           </button>
         </div>
       `;
     }
 
-    // Win Check Logic
+    function advanceRound() {
+      sfx.click();
+      if (G.mode === 'mafia') {
+        G.roundCount++;
+        startDiscussion();
+      } else {
+        goToNightApproaching();
+      }
+    }
+
     function checkWinConditions() {
-      const badGuys = G.players.filter(p => p.alive && (p.role === 'murderer' || p.role === 'mafia'));
-      const goodGuys = G.players.filter(p => p.alive && p.role !== 'murderer' && p.role !== 'mafia');
+      const badTeam = G.players.filter(p => p.alive && (p.role === 'mafia' || p.role === 'murderer'));
+      const goodTeam = G.players.filter(p => p.alive && p.role !== 'mafia' && p.role !== 'murderer');
 
-      if (badGuys.length === 0) {
-        G.winner = G.mode === 'murder_mystery' ? 'MANOR GUESTS & DETECTIVE' : 'CIVILIANS';
+      if (G.players.length === 0) return false;
+
+      if (badTeam.length === 0) {
+        G.winner = G.mode === 'mafia' ? 'CIVILIANS' : 'MANOR GUESTS';
         G.phase = 'game_over';
         if (G.netMode === 'online') broadcastState();
         else renderState();
         return true;
       }
-
-      if (badGuys.length >= goodGuys.length) {
-        G.winner = G.mode === 'murder_mystery' ? 'MURDERERS' : 'MAFIA';
+      if (badTeam.length >= goodTeam.length) {
+        G.winner = G.mode === 'mafia' ? 'MAFIA' : 'MURDERER';
         G.phase = 'game_over';
         if (G.netMode === 'online') broadcastState();
         else renderState();
         return true;
       }
-
       return false;
     }
 
-    // --- SCREEN 11: GAME OVER ---
     function renderGameOver() {
-      const isBadWin = G.winner === 'MURDERERS' || G.winner === 'MAFIA';
-
+      const isBadWin = G.winner === 'MAFIA' || G.winner === 'MURDERER';
       return `
-        <div class="flex flex-col items-center text-center space-y-6 w-full animate-float">
+        <div class="flex flex-col items-center text-center space-y-6 w-full">
           <div>
-            <span class="text-xs font-bold text-slate-400 uppercase tracking-widest block">GAME CONCLUDED</span>
-            <h2 class="text-4xl font-black ${isBadWin ? 'text-red-400' : 'text-emerald-400'} mt-1">${G.winner} VICTORY!</h2>
+            <span class="text-xs font-bold text-slate-400 uppercase tracking-widest block">GAME FINALE CONCLUDED</span>
+            <h2 class="text-4xl font-black ${isBadWin ? 'text-red-400' : 'text-emerald-400'} mt-1">${G.winner} WIN!</h2>
           </div>
-
-          <div class="w-full bg-slate-950/60 border border-slate-800 rounded-2xl p-4 max-h-56 overflow-y-auto space-y-2">
-            <span class="text-xs text-slate-400 font-bold uppercase tracking-wider block mb-1">ALL PLAYER ROLES</span>
+          <div class="w-full bg-slate-950/60 border border-slate-800 rounded-2xl p-4 max-h-48 overflow-y-auto space-y-2">
+            <span class="text-xs text-slate-400 font-bold uppercase tracking-wider block mb-1">ALL PLAYER ROLES & FINAL STATUS</span>
             ${G.players.map(p => `
               <div class="flex items-center justify-between bg-slate-900/90 border border-slate-800 rounded-xl px-4 py-2 text-xs font-semibold">
-                <span class="text-white">${p.name}</span>
-                <span class="${p.role === 'murderer' || p.role === 'mafia' ? 'text-red-400' : 'text-emerald-400'} uppercase font-bold">${p.role.replace('_', ' ')}</span>
+                <span class="text-white ${!p.alive ? 'line-through text-slate-500' : ''}">${p.name}</span>
+                <span class="${p.role === 'mafia' || p.role === 'murderer' ? 'text-red-400' : 'text-emerald-400'} uppercase font-bold">${p.role.replace('_', ' ')}</span>
               </div>
             `).join('')}
           </div>
-
-          <button onclick="G.phase='mode_select'; renderState();" class="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-sm rounded-xl shadow-lg glow-blue transition-all">
-            PLAY AGAIN &rarr;
+          <button onclick="G.phase='mode_select'; renderState();" class="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-sm rounded-xl shadow-lg glow-blue transition-all cursor-pointer">
+            PLAY ANOTHER GAME &rarr;
           </button>
         </div>
       `;
     }
 
-    document.addEventListener('DOMContentLoaded', () => {
-      renderState();
-    });
-    window.onload = function() {
-      renderState();
-    };
+    document.addEventListener('DOMContentLoaded', () => { renderState(); });
+    window.onload = function() { renderState(); };
   </script>
 </body>
 </html>
