@@ -212,8 +212,13 @@
           let resolved = false;
           peer.on('open', (id) => { if (!resolved) { resolved = true; resolve(id); } });
           peer.on('connection', (conn) => {
-            peerConns.push(conn);
-            conn.on('data', (data) => handleIncomingData(data));
+            if (!peerConns.includes(conn)) {
+              peerConns.push(conn);
+            }
+            conn.on('data', (data) => handleIncomingData(data, conn));
+            conn.on('close', () => {
+              peerConns = peerConns.filter(c => c !== conn);
+            });
           });
           peer.on('error', () => { if (!resolved) { resolved = true; resolve(null); } });
           setTimeout(() => { if (!resolved) { resolved = true; resolve(peer?.id || null); } }, 2000);
@@ -245,21 +250,18 @@
       renderState();
     }
 
-    function handleIncomingData(data) {
+    function handleIncomingData(data, conn = null) {
       if (data.type === 'STATE_UPDATE') {
         Object.assign(G, data.state);
         renderState();
       } else if (data.type === 'JOIN_REQUEST' && G.isHost) {
+        if (conn) {
+          conn.peerPlayerId = data.player.id;
+        }
         if (!G.players.find(p => p.id === data.player.id)) {
           G.players.push(data.player);
-          // Associate connection with player ID for secret broadcasts
-          peerConns.forEach(conn => {
-            if (conn && conn.open && !conn.peerPlayerId) {
-              conn.peerPlayerId = data.player.id;
-            }
-          });
-          broadcastState();
         }
+        broadcastState();
       } else if (data.type === 'CAST_VOTE') {
         if (G.isHost) {
           G.votes[data.voterId] = data.targetId;
@@ -640,13 +642,14 @@
       const hostPeerId = 'imposter_room_' + G.roomCode;
       try {
         const conn = peer.connect(hostPeerId);
+        peerConns.push(conn);
         conn.on('open', () => {
           conn.send({
             type: 'JOIN_REQUEST',
             player: { id: G.myPlayerId, name: name, role: '', alive: true }
           });
         });
-        conn.on('data', (data) => handleIncomingData(data));
+        conn.on('data', (data) => handleIncomingData(data, conn));
       } catch (err) {}
       renderState();
     }
