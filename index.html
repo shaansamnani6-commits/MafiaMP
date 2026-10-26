@@ -208,7 +208,23 @@
     function broadcastState() {
       if (!G.isHost) return;
       peerConns.forEach(conn => {
-        if (conn && conn.open) conn.send({ type: 'STATE_UPDATE', state: G });
+        if (conn && conn.open) {
+          // Send customized state per connection so private roles aren't leaked
+          const connPlayerId = conn.peerPlayerId;
+          const sanitizedState = JSON.parse(JSON.stringify(G));
+          
+          if (G.phase === 'reveal') {
+            sanitizedState.players.forEach(p => {
+              if (p.id !== connPlayerId) {
+                // Keep partner roles visible if both are bad guys
+                const viewer = G.players.find(x => x.id === connPlayerId);
+                const isBothBad = viewer && (viewer.role === 'mafia' || viewer.role === 'murderer') && (p.role === 'mafia' || p.role === 'murderer');
+                if (!isBothBad) p.role = '???';
+              }
+            });
+          }
+          conn.send({ type: 'STATE_UPDATE', state: sanitizedState });
+        }
       });
       renderState();
     }
@@ -220,11 +236,24 @@
       } else if (data.type === 'JOIN_REQUEST' && G.isHost) {
         if (!G.players.find(p => p.id === data.player.id)) {
           G.players.push(data.player);
+          // Associate connection with player ID for secret broadcasts
+          peerConns.forEach(conn => {
+            if (conn && conn.open && !conn.peerPlayerId) {
+              conn.peerPlayerId = data.player.id;
+            }
+          });
           broadcastState();
         }
-      } else if (data.type === 'CAST_VOTE' && G.isHost) {
-        G.votes[data.voterId] = data.targetId;
-        broadcastState();
+      } else if (data.type === 'CAST_VOTE') {
+        if (G.isHost) {
+          G.votes[data.voterId] = data.targetId;
+          const livingPlayers = G.players.filter(p => p.alive);
+          if (Object.keys(G.votes).length >= livingPlayers.length) {
+            tallyVotesAndEliminate();
+          } else {
+            broadcastState();
+          }
+        }
       }
     }
 
@@ -605,7 +634,9 @@
     }
 
     function renderReveal() {
-      const p = G.players[G.currentRevealIdx];
+      // In online mode, always view YOUR OWN role card on your device
+      const myPlayer = G.players.find(p => p.id === G.myPlayerId) || G.players[G.currentRevealIdx];
+      const p = G.netMode === 'online' ? myPlayer : G.players[G.currentRevealIdx];
       const isMafiaMode = G.mode === 'mafia';
 
       let roleTitle = '';
@@ -635,6 +666,41 @@
       const partners = G.players
         .filter(x => x.id !== p.id && (x.role === 'mafia' || x.role === 'murderer'))
         .map(x => x.name);
+
+      if (G.netMode === 'online') {
+        return `
+          <div class="flex flex-col items-center text-center space-y-6 w-full">
+            <div class="w-full bg-slate-950/60 border border-slate-800 rounded-3xl p-6 flex flex-col items-center">
+              <span class="text-xs text-slate-400 uppercase tracking-widest font-bold">ONLINE DEVICE ROLE</span>
+              <h2 class="text-3xl font-extrabold text-white mt-1">${p.name}</h2>
+              <p class="text-xs text-slate-400 mt-2">Keep your device screen hidden from other players!</p>
+            </div>
+
+            ${!G.showCardModal ? `
+              <button onclick="G.showCardModal=true; sfx.click(); renderState();" class="w-full py-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-extrabold text-base rounded-2xl shadow-xl hover:opacity-95 transition-all glow-blue cursor-pointer">
+                VIEW MY SECRET ROLE CARD
+              </button>
+            ` : `
+              <div class="w-full bg-slate-950/80 border ${isBad ? 'border-red-500/50' : 'border-emerald-500/50'} rounded-3xl p-6 flex flex-col items-center">
+                <span class="text-xs font-bold uppercase tracking-widest text-slate-400 mb-1">YOUR SECRET ROLE</span>
+                <h3 class="text-3xl font-black ${isBad ? 'text-red-400' : 'text-emerald-400'} mb-2">${roleTitle}</h3>
+                <p class="text-xs text-slate-300 max-w-xs mb-4 leading-relaxed">${roleDesc}</p>
+                ${isBad && partners.length > 0 ? `
+                  <div class="w-full bg-slate-900/90 border border-red-900/40 rounded-xl p-3 mb-4">
+                    <span class="text-xs text-red-400 font-bold block">PARTNERS IN CRIME:</span>
+                    <span class="text-sm font-semibold text-white">${partners.join(', ')}</span>
+                  </div>
+                ` : ''}
+                ${G.isHost ? `
+                  <button onclick="startDiscussion()" class="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-sm transition-all cursor-pointer">Start Discussion Phase &rarr;</button>
+                ` : `
+                  <p class="text-xs text-indigo-400 font-bold animate-pulse mt-2">Waiting for Host to start discussion...</p>
+                `}
+              </div>
+            `}
+          </div>
+        `;
+      }
 
       return `
         <div class="flex flex-col items-center text-center space-y-6 w-full">
@@ -889,8 +955,58 @@
 
     function renderVoteBallot() {
       const livingPlayers = G.players.filter(p => p.alive);
-      const currentVoter = livingPlayers[G.currentVoterIdx];
 
+      if (G.netMode === 'online') {
+        const myPlayer = G.players.find(p => p.id === G.myPlayerId);
+        const hasVoted = G.votes[G.myPlayerId] !== undefined;
+
+        if (!myPlayer || !myPlayer.alive) {
+          return `
+            <div class="flex flex-col items-center text-center space-y-6 w-full">
+              <div class="inline-block px-3.5 py-1 bg-red-950 border border-red-500/40 text-red-300 text-xs font-bold uppercase rounded-full mb-2">
+                SPECTATOR MODE
+              </div>
+              <h2 class="text-2xl font-black text-white">VOTING IN PROGRESS</h2>
+              <p class="text-xs text-slate-400">You are eliminated. Waiting for living players to submit their votes (${Object.keys(G.votes).length}/${livingPlayers.length})...</p>
+            </div>
+          `;
+        }
+
+        if (hasVoted) {
+          return `
+            <div class="flex flex-col items-center text-center space-y-6 w-full">
+              <div class="inline-block px-3.5 py-1 bg-indigo-950 border border-indigo-500/40 text-indigo-300 text-xs font-bold uppercase rounded-full mb-2">
+                BALLOT SUBMITTED
+              </div>
+              <h2 class="text-2xl font-black text-emerald-400">VOTE RECORDED!</h2>
+              <p class="text-xs text-slate-300">Waiting for other players to finish voting (${Object.keys(G.votes).length}/${livingPlayers.length})...</p>
+            </div>
+          `;
+        }
+
+        return `
+          <div class="flex flex-col items-center text-center space-y-6 w-full">
+            <div>
+              <div class="inline-block px-3.5 py-1 bg-indigo-950 border border-indigo-500/40 text-indigo-300 text-xs font-bold uppercase rounded-full mb-2">
+                ONLINE BALLOT (${Object.keys(G.votes).length}/${livingPlayers.length} Voted)
+              </div>
+              <h2 class="text-2xl font-black text-white">CAST YOUR VOTE</h2>
+              <p class="text-xs text-slate-400 mt-1">Select a suspect to eliminate.</p>
+            </div>
+            <div class="w-full space-y-2 max-h-48 overflow-y-auto">
+              ${livingPlayers.filter(p => p.id !== G.myPlayerId).map(p => `
+                <button onclick="castBallot('${G.myPlayerId}', '${p.id}')" class="w-full p-3.5 bg-slate-900 hover:bg-slate-800 border border-slate-700/80 rounded-xl flex items-center justify-between font-bold text-sm text-slate-200 transition-all cursor-pointer">
+                  <span>${p.name}</span>
+                  <span class="text-xs text-blue-400">Vote &rarr;</span>
+                </button>
+              `).join('')}
+            </div>
+          </div>
+        `;
+      }
+
+      // Pass-The-Phone Mode logic
+      const currentVoter = livingPlayers[G.currentVoterIdx];
       if (!currentVoter) {
         tallyVotesAndEliminate();
         return '';
@@ -920,6 +1036,26 @@
     function castBallot(voterId, targetId) {
       sfx.click();
       G.votes[voterId] = targetId;
+
+      if (G.netMode === 'online') {
+        if (!G.isHost) {
+          // Send vote to host peer
+          const hostConn = peerConns.find(c => c && c.open);
+          if (hostConn) {
+            hostConn.send({ type: 'CAST_VOTE', voterId: voterId, targetId: targetId });
+          }
+        } else {
+          const livingPlayers = G.players.filter(p => p.alive);
+          if (Object.keys(G.votes).length >= livingPlayers.length) {
+            tallyVotesAndEliminate();
+          } else {
+            broadcastState();
+          }
+        }
+        renderState();
+        return;
+      }
+
       const livingPlayers = G.players.filter(p => p.alive);
       if (G.currentVoterIdx + 1 < livingPlayers.length) {
         G.currentVoterIdx++;
