@@ -217,18 +217,16 @@
       return new Promise((resolve) => {
         try {
           if (peer) { try { peer.destroy(); } catch(e) {} }
-          peer = customId ? new Peer(customId, { host: '0.peerjs.com', port: 443, secure: true }) : new Peer({ host: '0.peerjs.com', port: 443, secure: true });
+          peer = customId ? new Peer(customId, { debug: 1 }) : new Peer({ debug: 1 });
           let resolved = false;
           peer.on('open', (id) => { if (!resolved) { resolved = true; resolve(id); } });
           peer.on('connection', (conn) => {
-            // Avoid duplicate connection tracking
             if (!peerConns.some(c => c.peer === conn.peer)) {
               peerConns.push(conn);
             }
             conn.on('data', (data) => handleIncomingData(data, conn));
             conn.on('close', () => {
               peerConns = peerConns.filter(c => c !== conn);
-              // If host, remove player who disconnected
               if (G.isHost && conn.peerPlayerId) {
                 G.players = G.players.filter(p => p.id !== conn.peerPlayerId);
                 broadcastState();
@@ -238,8 +236,11 @@
               peerConns = peerConns.filter(c => c !== conn);
             });
           });
-          peer.on('error', () => { if (!resolved) { resolved = true; resolve(null); } });
-          setTimeout(() => { if (!resolved) { resolved = true; resolve(peer?.id || null); } }, 3000);
+          peer.on('error', (err) => {
+            console.warn("PeerJS error:", err);
+            if (!resolved) { resolved = true; resolve(peer?.id || null); }
+          });
+          setTimeout(() => { if (!resolved) { resolved = true; resolve(peer?.id || null); } }, 4000);
         } catch(e) { resolve(null); }
       });
     }
@@ -251,7 +252,6 @@
           const connPlayerId = conn.peerPlayerId;
           const sanitizedState = JSON.parse(JSON.stringify(G));
           
-          // Hide private roles from other players across all active phases
           sanitizedState.players.forEach(p => {
             if (p.id !== connPlayerId) {
               const viewer = G.players.find(x => x.id === connPlayerId);
@@ -366,6 +366,8 @@
       const badge = document.getElementById('gameModeBadge');
       const title = document.getElementById('headerTitle');
       const sub = document.getElementById('headerSubtitle');
+
+      if (!container) return;
 
       if (G.phase === 'splash') {
         badge.textContent = 'PARTY & MAFIA EDITION';
@@ -526,7 +528,6 @@
         </div>
       `;
 
-      // Validation logic for player count vs mafia ratio
       const totalPlayers = G.players.length;
       let targetBadCount = 1;
       if (G.imposterCountMode === 'auto') {
@@ -549,7 +550,7 @@
 
       const allReady = G.netMode === 'online' ? G.players.length >= 3 && G.players.every(p => p.ready) : true;
       if (G.netMode === 'online' && !allReady && !isInvalidSetup && totalPlayers >= 3) {
-        warningMessage = '⏳ Waiting for all connected players to hit "Ready" standard before game start!';
+        warningMessage = '⏳ Waiting for all connected players to hit "Ready" before game start!';
       }
 
       const warningHTML = warningMessage ? `
@@ -692,7 +693,6 @@
       
       const createdId = await initPeer('imposter_room_' + G.roomCode);
       if (!createdId) {
-        // Fallback or retry logic if peer ID collision occurs
         G.roomCode = generateCode();
         await initPeer('imposter_room_' + G.roomCode);
       }
@@ -774,7 +774,6 @@
     }
 
     function renderReveal() {
-      // Strictly reference own player object on client devices in online mode
       const myPlayer = G.players.find(p => p.id === G.myPlayerId) || G.players[0];
       const p = G.netMode === 'online' ? myPlayer : G.players[G.currentRevealIdx];
       const isMafiaMode = G.mode === 'mafia';
@@ -784,7 +783,7 @@
       let isBad = false;
 
       if (isMafiaMode) {
-        if (p.role === 'mafia') {
+        if (p && p.role === 'mafia') {
           roleTitle = 'MAFIA';
           roleDesc = 'Secretly eliminate players each night and deceive the group during debates!';
           isBad = true;
@@ -793,7 +792,7 @@
           roleDesc = 'Identify suspicious patterns, defend yourself, and vote out the Mafia!';
         }
       } else {
-        if (p.role === 'murderer') {
+        if (p && p.role === 'murderer') {
           roleTitle = 'MURDERER';
           roleDesc = 'Secretly choose victims each night and cover your tracks during manor investigations!';
           isBad = true;
@@ -804,7 +803,7 @@
       }
 
       const partners = G.players
-        .filter(x => x.id !== p.id && (x.role === 'mafia' || x.role === 'murderer'))
+        .filter(x => p && x.id !== p.id && (x.role === 'mafia' || x.role === 'murderer'))
         .map(x => x.name);
 
       if (G.netMode === 'online') {
@@ -812,7 +811,7 @@
           <div class="flex flex-col items-center text-center space-y-6 w-full">
             <div class="w-full bg-slate-950/60 border border-slate-800 rounded-3xl p-6 flex flex-col items-center">
               <span class="text-xs text-slate-400 uppercase tracking-widest font-bold">ONLINE DEVICE ROLE</span>
-              <h2 class="text-3xl font-extrabold text-white mt-1">${p.name}</h2>
+              <h2 class="text-3xl font-extrabold text-white mt-1">${p ? p.name : 'Player'}</h2>
               <p class="text-xs text-slate-400 mt-2">Keep your device screen hidden from other players!</p>
             </div>
 
@@ -846,7 +845,7 @@
         <div class="flex flex-col items-center text-center space-y-6 w-full">
           <div class="w-full bg-slate-950/60 border border-slate-800 rounded-3xl p-6 flex flex-col items-center">
             <span class="text-xs text-slate-400 uppercase tracking-widest font-bold">PASS PHONE TO</span>
-            <h2 class="text-3xl font-extrabold text-white mt-1">${p.name}</h2>
+            <h2 class="text-3xl font-extrabold text-white mt-1">${p ? p.name : 'Player'}</h2>
             <p class="text-xs text-slate-400 mt-2">Keep your secret card hidden!</p>
           </div>
 
@@ -979,7 +978,7 @@
       G.phase = 'vote_ballot';
       G.votes = {};
       G.currentVoterIdx = 0;
-      G.voteTimeLeft = 120; // 2 minute voting timer
+      G.voteTimeLeft = 120;
       if (G.netMode === 'online') broadcastState();
       else renderState();
       startVoteTimer();
@@ -1059,7 +1058,6 @@
         `;
       }
 
-      // Pass the Phone Mode Voting
       const currentVoter = livingPlayers[G.currentVoterIdx];
       return `
         <div class="flex flex-col items-center text-center space-y-6 w-full animate-fade-in">
@@ -1155,7 +1153,6 @@
       const myPlayer = G.players.find(p => p.id === G.myPlayerId);
       const isBadGuy = myPlayer && (myPlayer.role === 'murderer' || myPlayer.role === 'mafia');
 
-      // If user is innocent in online mode, show sleeping night screen
       if (G.netMode === 'online' && !isBadGuy) {
         return `
           <div class="flex flex-col items-center text-center space-y-6 w-full animate-fade-in py-4">
@@ -1300,7 +1297,7 @@
             <div class="w-full bg-red-950/40 border border-red-800/60 p-5 rounded-2xl flex flex-col items-center space-y-3">
               <span class="text-xs text-red-400 font-bold uppercase tracking-widest">ELIMINATED BY GROUP VOTE</span>
               <span class="text-2xl font-black text-white">${G.lastEliminatedPlayer.name}</span>
-              <span class="text-xs text-slate-300">True identity: <strong class="text-red-400 uppercase">${G.lastEliminatedPlayer.role.replace('_', ' ')}</strong></span>
+              <span class="text-xs text-slate-300">True identity: <strong class="text-red-400 uppercase">${(G.lastEliminatedPlayer.role || '???').replace('_', ' ')}</strong></span>
               <div class="w-full bg-slate-900 border border-red-900/40 p-3 rounded-xl text-left mt-2">
                 <span class="text-[10px] text-red-400 font-bold uppercase tracking-widest block mb-0.5">Game Forfeit:</span>
                 <p class="text-xs font-semibold text-slate-200">${G.lastEliminatedForfeit}</p>
@@ -1354,7 +1351,6 @@
 
       if (G.players.length === 0) return false;
 
-      // Good team wins if ALL bad team members are dead
       if (badTeam.length === 0) {
         G.winner = G.mode === 'mafia' ? 'CIVILIANS' : 'MANOR GUESTS';
         G.phase = 'game_over';
@@ -1363,7 +1359,6 @@
         return true;
       }
 
-      // Special rule: 2 Guests vs 1 Murderer in Murder Mystery = Manor Guests Win!
       if (G.mode === 'murder_mystery' && goodTeam.length === 2 && badTeam.length === 1) {
         G.winner = 'MANOR GUESTS';
         G.phase = 'game_over';
@@ -1372,7 +1367,6 @@
         return true;
       }
 
-      // Bad team wins ONLY when 2 bad team vs 1 good team, or good team reaches 0
       if (goodTeam.length === 0 || (badTeam.length === 2 && goodTeam.length === 1)) {
         G.winner = G.mode === 'mafia' ? 'MAFIA' : 'MURDERER';
         G.phase = 'game_over';
@@ -1397,7 +1391,1415 @@
             ${G.players.map(p => `
               <div class="flex items-center justify-between bg-slate-900/90 border border-slate-800 rounded-xl px-4 py-2 text-xs font-semibold">
                 <span class="text-white ${!p.alive ? 'line-through text-slate-500' : ''}">${p.name}</span>
-                <span class="${p.role === 'mafia' || p.role === 'murderer' ? 'text-red-400' : 'text-emerald-400'} uppercase font-bold">${p.role.replace('_', ' ')}</span>
+                <span class="${p.role === 'mafia' || p.role === 'murderer' ? 'text-red-400' : 'text-emerald-400'} uppercase font-bold">${(p.role || '???').replace('_', ' ')}</span>
+              </div>
+            `).join('')}
+          </div>
+          <button onclick="G.phase='mode_select'; renderState();" class="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-sm rounded-xl shadow-lg glow-blue transition-all cursor-pointer">
+            PLAY ANOTHER GAME &rarr;
+          </button>
+        </div>
+      `;
+    }
+
+    document.addEventListener('DOMContentLoaded', () => { renderState(); });
+    window.onload = function() { renderState(); };
+  </script>
+</body>
+</html><!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Who Is The Imposter? - Beta Squad Style Edition</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- PeerJS for P2P Networking -->
+  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+  <!-- Google Font -->
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background: #0d1124;
+      background: radial-gradient(circle at top, #1a2246 0%, #0d1124 100%);
+      color: #ffffff;
+      user-select: none;
+      min-height: 100vh;
+      margin: 0;
+      padding: 24px 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+    }
+
+    .card-glass {
+      background: rgba(22, 30, 60, 0.85);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
+    }
+
+    .card-interactive {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .card-interactive:hover {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: rgba(99, 102, 241, 0.5);
+      transform: translateY(-2px);
+    }
+
+    .glow-blue {
+      box-shadow: 0 0 30px rgba(59, 130, 246, 0.35);
+    }
+    .glow-indigo {
+      box-shadow: 0 0 30px rgba(99, 102, 241, 0.4);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Main Container -->
+  <div id="app" class="w-full max-w-xl card-glass rounded-[32px] p-6 sm:p-8 relative z-10 my-auto">
+    <!-- Header -->
+    <header class="text-center mb-6">
+      <div class="inline-flex items-center gap-2 px-4 py-1.5 bg-indigo-950/70 border border-indigo-500/30 rounded-full text-indigo-300 text-xs font-bold tracking-widest uppercase mb-3 shadow-inner">
+        <span id="gameModeBadge">PARTY & MAFIA EDITION</span>
+      </div>
+      <h1 id="headerTitle" class="text-3xl sm:text-4xl font-extrabold tracking-tight text-white">
+        Who Is The Imposter?
+      </h1>
+      <p id="headerSubtitle" class="text-xs sm:text-sm text-slate-400 mt-2 font-medium max-w-md mx-auto">
+        Multi-round deductions, dramatic eliminations, and game forfeits!
+      </p>
+    </header>
+
+    <!-- Screen Container -->
+  <main id="screenContainer" class="flex flex-col items-center w-full justify-center">
+    <!-- Dynamically Rendered -->
+  </main>
+</div>
+
+<!-- Modal for Online Join Room Code Input -->
+<div id="joinModal" class="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-50 hidden">
+  <div class="card-glass w-full max-w-sm rounded-3xl p-6 text-center space-y-4 border border-slate-700">
+    <div class="w-12 h-12 rounded-full bg-indigo-950 border border-indigo-500/50 flex items-center justify-center mx-auto text-xl text-indigo-400">
+      🔑
+    </div>
+    <h3 class="text-xl font-bold text-white">Enter Room Code</h3>
+    <p class="text-xs text-slate-400">Type the 4-letter room code provided by the host:</p>
+    <input type="text" id="modalRoomCodeInput" placeholder="e.g. ABCD" maxlength="4" class="w-full bg-slate-900 border border-indigo-500/50 rounded-xl px-4 py-3 text-center text-2xl font-extrabold text-indigo-400 uppercase tracking-widest focus:outline-none focus:border-indigo-400">
+    <div class="flex gap-2">
+      <button onclick="closeJoinModal()" class="w-1/2 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs rounded-xl cursor-pointer">Cancel</button>
+      <button onclick="submitJoinModal()" class="w-1/2 py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl shadow-lg glow-blue cursor-pointer">Join Game</button>
+    </div>
+  </div>
+</div>
+
+<!-- Audio & TTS Engine -->
+  <script>
+    class SoundFX {
+      constructor() { this.ctx = null; }
+      init() { if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)(); }
+      click() {
+        try {
+          this.init();
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.frequency.setValueAtTime(600, this.ctx.currentTime);
+          osc.frequency.exponentialRampToValueAtTime(200, this.ctx.currentTime + 0.08);
+          gain.gain.setValueAtTime(0.3, this.ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.08);
+          osc.connect(gain); gain.connect(this.ctx.destination);
+          osc.start(); osc.stop(this.ctx.currentTime + 0.08);
+        } catch(e) {}
+      }
+      elim() {
+        try {
+          this.init();
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(180, this.ctx.currentTime);
+          osc.frequency.exponentialRampToValueAtTime(40, this.ctx.currentTime + 0.5);
+          gain.gain.setValueAtTime(0.5, this.ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.5);
+          osc.connect(gain); gain.connect(this.ctx.destination);
+          osc.start(); osc.stop(this.ctx.currentTime + 0.5);
+        } catch(e) {}
+      }
+      gong() {
+        try {
+          this.init();
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(110, this.ctx.currentTime);
+          osc.frequency.exponentialRampToValueAtTime(55, this.ctx.currentTime + 1.2);
+          gain.gain.setValueAtTime(0.6, this.ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 1.2);
+          osc.connect(gain); gain.connect(this.ctx.destination);
+          osc.start(); osc.stop(this.ctx.currentTime + 1.2);
+        } catch(e) {}
+      }
+    }
+    const sfx = new SoundFX();
+  </script>
+
+  <!-- Game State & Controller -->
+  <script>
+    const G = {
+      mode: 'murder_mystery', // 'murder_mystery' or 'mafia'
+      imposterCountMode: 'auto',
+      netMode: 'pass_phone',
+      roomCode: '',
+      isHost: true,
+      myPlayerId: '',
+      players: [],
+      phase: 'splash', // Start with opening splash slide
+      currentRevealIdx: 0,
+      showCardModal: false,
+      currentVoterIdx: 0,
+      votes: {},
+      discussionTimeLeft: 300,
+      voteTimeLeft: 120,
+      timerInterval: null,
+      voteTimerInterval: null,
+      murdererTargetId: null,
+      lastEliminatedPlayer: null,
+      lastEliminatedForfeit: '',
+      winner: null,
+      currentPrompt: '',
+      roundCount: 1,
+      tiebreakerActive: false
+    };
+
+    const gameForfeits = [
+      "Must wear a blindfold during the next entire discussion cycle!",
+      "Must speak in a dramatic British accent for the rest of the game!",
+      "Must sit facing the wall during the next interrogation round!",
+      "Hand over your jacket or phone to the group until the game concludes!",
+      "Must answer every question with a question for the next 2 rounds!",
+      "Must do 20 push-ups right now in the center of the room!",
+      "Must sing your answers in opera style for the next round!",
+      "Must speak only in whispers for the next two interrogation cycles!"
+    ];
+
+    const mafiaPrompts = [
+      "Who was trying to dominate the conversation or defend someone too quickly?",
+      "Which player's voting pattern or reaction during the last cycle felt out of character?",
+      "If the person to your left turns out to be part of the mafia, would you be surprised?",
+      "Who is sitting quietly without contributing much to the group deduction?",
+      "Who do you trust the absolute least in this circle right now and why?",
+      "Who changed their story or looked nervous when accused?",
+      "If you had to pick one person right now to banish from the group, who is it?"
+    ];
+
+    const murderMysteryPrompts = [
+      "Who was acting overly quiet or evasive during the last few hours in the manor?",
+      "Who do you suspect most of wandering the halls alone last night?",
+      "If you had to inspect one person right now for hidden motives, who would it be?",
+      "Who is trying too hard to direct suspicion away from themselves?",
+      "Whose alibi or story about last night felt the most rehearsed or suspicious?",
+      "Who was standing closest to the crime scene before lights went out?",
+      "Who reacted with fake shock when the elimination was announced?"
+    ];
+
+    function getRandomPrompt() {
+      const pool = G.mode === 'mafia' ? mafiaPrompts : murderMysteryPrompts;
+      return pool[Math.floor(Math.random() * pool.length)];
+    }
+
+    function getRandomForfeit() {
+      return gameForfeits[Math.floor(Math.random() * gameForfeits.length)];
+    }
+
+    let peer = null;
+    let peerConns = [];
+
+    function initPeer(customId = null) {
+      return new Promise((resolve) => {
+        try {
+          if (peer) { try { peer.destroy(); } catch(e) {} }
+          peer = customId ? new Peer(customId, { debug: 1 }) : new Peer({ debug: 1 });
+          let resolved = false;
+          peer.on('open', (id) => { if (!resolved) { resolved = true; resolve(id); } });
+          peer.on('connection', (conn) => {
+            if (!peerConns.some(c => c.peer === conn.peer)) {
+              peerConns.push(conn);
+            }
+            conn.on('data', (data) => handleIncomingData(data, conn));
+            conn.on('close', () => {
+              peerConns = peerConns.filter(c => c !== conn);
+              if (G.isHost && conn.peerPlayerId) {
+                G.players = G.players.filter(p => p.id !== conn.peerPlayerId);
+                broadcastState();
+              }
+            });
+            conn.on('error', () => {
+              peerConns = peerConns.filter(c => c !== conn);
+            });
+          });
+          peer.on('error', (err) => {
+            console.warn("PeerJS error:", err);
+            if (!resolved) { resolved = true; resolve(peer?.id || null); }
+          });
+          setTimeout(() => { if (!resolved) { resolved = true; resolve(peer?.id || null); } }, 4000);
+        } catch(e) { resolve(null); }
+      });
+    }
+
+    function broadcastState() {
+      if (!G.isHost) return;
+      peerConns.forEach(conn => {
+        if (conn && conn.open) {
+          const connPlayerId = conn.peerPlayerId;
+          const sanitizedState = JSON.parse(JSON.stringify(G));
+          
+          sanitizedState.players.forEach(p => {
+            if (p.id !== connPlayerId) {
+              const viewer = G.players.find(x => x.id === connPlayerId);
+              const isBothBad = viewer && (viewer.role === 'mafia' || viewer.role === 'murderer') && (p.role === 'mafia' || p.role === 'murderer');
+              if (!isBothBad) p.role = '???';
+            }
+          });
+          conn.send({ type: 'STATE_UPDATE', state: sanitizedState });
+        }
+      });
+      renderState();
+    }
+
+    function handleIncomingData(data, conn = null) {
+      if (data.type === 'STATE_UPDATE') {
+        Object.assign(G, data.state);
+        renderState();
+      } else if (data.type === 'JOIN_REQUEST' && G.isHost) {
+        if (conn) {
+          conn.peerPlayerId = data.player.id;
+        }
+        if (!G.players.find(p => p.id === data.player.id)) {
+          G.players.push(data.player);
+        }
+        broadcastState();
+      } else if (data.type === 'TOGGLE_READY') {
+        const player = G.players.find(p => p.id === data.playerId);
+        if (player) {
+          player.ready = data.ready;
+          if (G.isHost) broadcastState();
+        }
+      } else if (data.type === 'SELECT_NIGHT_TARGET' && G.isHost) {
+        G.murdererTargetId = data.targetId;
+        broadcastState();
+      } else if (data.type === 'CAST_VOTE') {
+        if (G.isHost) {
+          G.votes[data.voterId] = data.targetId;
+          const livingPlayers = G.players.filter(p => p.alive);
+          if (Object.keys(G.votes).length >= livingPlayers.length) {
+            if (G.voteTimerInterval) clearInterval(G.voteTimerInterval);
+            tallyVotesAndEliminate();
+          } else {
+            broadcastState();
+          }
+        }
+      }
+    }
+
+    function generateCode() {
+      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+      let code = '';
+      for (let i = 0; i < 4; i++) code += chars.charAt(Math.floor(Math.random() * chars.length));
+      return code;
+    }
+
+    function shuffleArray(arr) {
+      const array = [...arr];
+      for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+      }
+      return array;
+    }
+
+    function assignRoles() {
+      const total = G.players.length;
+      let badCount = 1;
+      if (G.imposterCountMode === 'auto') {
+        if (total >= 7 && total <= 10) badCount = 2;
+        else if (total > 10) badCount = 3;
+      } else {
+        badCount = Math.min(parseInt(G.imposterCountMode, 10), Math.floor((total - 1) / 2));
+        if (badCount < 1) badCount = 1;
+      }
+
+      let roles = [];
+      if (G.mode === 'mafia') {
+        for (let i = 0; i < badCount; i++) roles.push('mafia');
+        while (roles.length < total) roles.push('civilian');
+      } else {
+        for (let i = 0; i < badCount; i++) roles.push('murderer');
+        while (roles.length < total) roles.push('manor_guest');
+      }
+
+      roles = shuffleArray(roles);
+      G.players.forEach((p, idx) => {
+        p.role = roles[idx];
+        p.alive = true;
+      });
+      G.roundCount = 1;
+      G.tiebreakerActive = false;
+    }
+
+    function toggleReadyState() {
+      sfx.click();
+      const myPlayer = G.players.find(p => p.id === G.myPlayerId);
+      if (!myPlayer) return;
+      myPlayer.ready = !myPlayer.ready;
+      if (G.isHost) {
+        broadcastState();
+      } else {
+        const hostConn = peerConns.find(c => c && c.open);
+        if (hostConn) {
+          hostConn.send({ type: 'TOGGLE_READY', playerId: G.myPlayerId, ready: myPlayer.ready });
+        }
+        renderState();
+      }
+    }
+
+    function renderState() {
+      const container = document.getElementById('screenContainer');
+      const badge = document.getElementById('gameModeBadge');
+      const title = document.getElementById('headerTitle');
+      const sub = document.getElementById('headerSubtitle');
+
+      if (!container) return;
+
+      if (G.phase === 'splash') {
+        badge.textContent = 'PARTY & MAFIA EDITION';
+        title.textContent = 'Who Is The Imposter?';
+        sub.textContent = 'Multi-round deductions, dramatic eliminations, and game forfeits!';
+        container.innerHTML = renderSplash();
+        return;
+      }
+
+      if (G.mode === 'murder_mystery') {
+        badge.textContent = 'MURDER MYSTERY EDITION';
+        title.textContent = 'Manor Murder Mystery';
+        sub.textContent = 'Find the murderer before you are eliminated in the dark!';
+      } else {
+        badge.textContent = 'CLASSIC MAFIA EDITION';
+        title.textContent = 'Classic Mafia';
+        sub.textContent = 'Multi-round debates, secret alliances, and elimination forfeits.';
+      }
+
+      switch (G.phase) {
+        case 'mode_select':
+          container.innerHTML = renderModeSelect();
+          break;
+        case 'lobby':
+          container.innerHTML = renderLobby();
+          break;
+        case 'reveal':
+          container.innerHTML = renderReveal();
+          break;
+        case 'discussion':
+          container.innerHTML = renderDiscussion();
+          break;
+        case 'night_approaching':
+          container.innerHTML = renderNightApproaching();
+          break;
+        case 'murderers_open_eyes':
+          container.innerHTML = renderMurderersOpenEyes();
+          break;
+        case 'morning_break':
+          container.innerHTML = renderMorningBreak();
+          break;
+        case 'vote_ballot':
+          container.innerHTML = renderVoteBallot();
+          break;
+        case 'vote_results':
+          container.innerHTML = renderVoteResults();
+          break;
+        case 'game_over':
+          container.innerHTML = renderGameOver();
+          break;
+      }
+    }
+
+    function renderSplash() {
+      return `
+        <div class="flex flex-col items-center text-center space-y-6 w-full py-6 animate-fade-in">
+          <div class="relative w-28 h-28 rounded-full bg-slate-950 border-2 border-indigo-500/60 flex items-center justify-center glow-indigo mb-2 shadow-2xl">
+            <span class="text-4xl">🎭</span>
+          </div>
+          <div class="space-y-1">
+            <h2 class="text-4xl sm:text-5xl font-black tracking-tight text-white uppercase drop-shadow-lg">
+              MAFIA
+            </h2>
+            <p class="text-xs font-bold text-indigo-400 tracking-widest uppercase">
+              (be prepared)
+            </p>
+          </div>
+          <p class="text-xs text-slate-400 max-w-xs leading-relaxed px-4">
+            Deceive your friends, survive the interrogations, and uncover the truth before time runs out.
+          </p>
+          <button onclick="sfx.click(); G.phase='mode_select'; renderState();" class="w-full py-4 mt-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-extrabold text-base rounded-2xl shadow-xl hover:opacity-95 transition-all glow-blue cursor-pointer">
+            ENTER GAME &rarr;
+          </button>
+        </div>
+      `;
+    }
+
+    function renderModeSelect() {
+      const isMystery = G.mode === 'murder_mystery';
+      const isPassPhone = G.netMode === 'pass_phone';
+
+      return `
+        <div class="flex flex-col items-center w-full space-y-4">
+          <button onclick="selectGameMode('murder_mystery')" class="w-full text-left p-5 rounded-2xl card-interactive flex items-center justify-between group cursor-pointer">
+            <div class="space-y-1 pr-4">
+              <div class="flex items-center gap-2">
+                <span class="text-xl">🏰</span>
+                <h3 class="text-xl font-bold text-white group-hover:text-blue-400 transition-colors">Murder Mystery</h3>
+              </div>
+              <p class="text-xs text-slate-400 max-w-xs leading-relaxed">
+                Roles: Murderer, Manor Guest. Features 3-min discussion, night kills, and ballot votes.
+              </p>
+            </div>
+            <span class="px-4 py-1.5 ${isMystery ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-800 text-slate-400'} text-xs font-bold rounded-full whitespace-nowrap">
+              Mystery
+            </span>
+          </button>
+
+          <button onclick="selectGameMode('mafia')" class="w-full text-left p-5 rounded-2xl card-interactive flex items-center justify-between group cursor-pointer">
+            <div class="space-y-1 pr-4">
+              <div class="flex items-center gap-2">
+                <span class="text-xl">🕵️</span>
+                <h3 class="text-xl font-bold text-white group-hover:text-blue-400 transition-colors">Classic Mafia</h3>
+              </div>
+              <p class="text-xs text-slate-400 max-w-xs leading-relaxed">
+                Roles: Mafia and Civilian. Features continuous 5-minute discussion timers alternating with voting ballots.
+              </p>
+            </div>
+            <span class="px-4 py-1.5 ${!isMystery ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-800 text-slate-400'} text-xs font-bold rounded-full whitespace-nowrap">
+              Classic
+            </span>
+          </button>
+
+          <div class="flex items-center justify-between w-full px-2 pt-2 border-t border-slate-800/80 mt-2">
+            <span class="text-xs text-slate-400 font-semibold">Networking Style:</span>
+            <div class="flex gap-2">
+              <button onclick="setNetMode('pass_phone')" class="px-3.5 py-1.5 rounded-full text-xs font-bold transition-all ${isPassPhone ? 'bg-blue-600 text-white shadow-md' : 'bg-slate-800 text-slate-400'} cursor-pointer">Pass-The-Phone</button>
+              <button onclick="setNetMode('online')" class="px-3.5 py-1.5 rounded-full text-xs font-bold transition-all ${!isPassPhone ? 'bg-blue-600 text-white shadow-md' : 'bg-slate-800 text-slate-400'} cursor-pointer">Online Party</button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function selectGameMode(mode) {
+      sfx.click();
+      G.mode = mode;
+      G.discussionTimeLeft = mode === 'mafia' ? 300 : 180;
+      G.phase = 'lobby';
+      renderState();
+    }
+
+    function setNetMode(net) {
+      sfx.click();
+      G.netMode = net;
+      renderState();
+    }
+
+    function renderLobby() {
+      const settingsHTML = `
+        <div class="w-full bg-slate-950/60 border border-slate-800 rounded-2xl p-4 space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-slate-300 uppercase tracking-wider">Active Rulebook</span>
+            <button onclick="G.mode = G.mode === 'mafia' ? 'murder_mystery' : 'mafia'; renderState();" class="px-3 py-1 bg-indigo-950 border border-indigo-500/40 text-indigo-300 text-xs font-bold rounded-full cursor-pointer">
+              Switch to ${G.mode === 'mafia' ? 'Murder Mystery' : 'Classic Mafia'}
+            </button>
+          </div>
+          <div>
+            <span class="text-xs font-bold text-slate-300 uppercase tracking-wider block mb-1.5">${G.mode === 'mafia' ? 'Mafia Count' : 'Murderer Count'}</span>
+            <div class="grid grid-cols-4 gap-2">
+              ${['auto', 1, 2, 3].map(c => `
+                <button onclick="setImposterCount('${c}')" class="py-2 px-2 rounded-xl border font-bold text-xs transition-all ${String(G.imposterCountMode) === String(c) ? 'bg-blue-600 border-blue-400 text-white shadow-md' : 'bg-slate-900 border-slate-700 text-slate-400 hover:text-white'} cursor-pointer">
+                  ${c === 'auto' ? 'Auto' : c}
+                </button>
+              `).join('')}
+            </div>
+          </div>
+        </div>
+      `;
+
+      const totalPlayers = G.players.length;
+      let targetBadCount = 1;
+      if (G.imposterCountMode === 'auto') {
+        if (totalPlayers >= 7 && totalPlayers <= 10) targetBadCount = 2;
+        else if (totalPlayers > 10) targetBadCount = 3;
+      } else {
+        targetBadCount = parseInt(G.imposterCountMode, 10);
+      }
+
+      let warningMessage = '';
+      let isInvalidSetup = false;
+
+      if (totalPlayers > 0 && totalPlayers < 3) {
+        warningMessage = '⚠️ Need at least 3 players to start the game!';
+        isInvalidSetup = true;
+      } else if (totalPlayers >= 3 && targetBadCount >= Math.ceil(totalPlayers / 2)) {
+        warningMessage = `⚠️ Uneven Game! ${targetBadCount} ${G.mode === 'mafia' ? 'Mafia' : 'Murderer'}(s) is too high for ${totalPlayers} players (must be less than half). Add more players or lower the count!`;
+        isInvalidSetup = true;
+      }
+
+      const allReady = G.netMode === 'online' ? G.players.length >= 3 && G.players.every(p => p.ready) : true;
+      if (G.netMode === 'online' && !allReady && !isInvalidSetup && totalPlayers >= 3) {
+        warningMessage = '⏳ Waiting for all connected players to hit "Ready" before game start!';
+      }
+
+      const warningHTML = warningMessage ? `
+        <div class="w-full bg-amber-950/70 border border-amber-500/50 p-3 rounded-xl text-amber-300 text-xs font-bold text-center animate-fade-in shadow-inner">
+          ${warningMessage}
+        </div>
+      ` : '';
+
+      if (G.netMode === 'pass_phone') {
+        return `
+          <div class="flex flex-col items-center w-full space-y-4">
+            ${settingsHTML}
+            ${warningHTML}
+            <div class="w-full space-y-2 text-left">
+              <label class="text-xs font-bold text-slate-300 uppercase tracking-wider block">Add Players (Min 3)</label>
+              <div class="flex gap-2 w-full">
+                <input type="text" id="playerNameInput" placeholder="Enter player name..." class="flex-1 bg-slate-900/80 border border-slate-700/80 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-500 text-white placeholder-slate-500" onkeypress="if(event.key==='Enter') addPassPlayer()">
+                <button onclick="addPassPlayer()" class="bg-blue-600 hover:bg-blue-500 text-white font-bold px-6 py-3 rounded-xl transition-all shadow-md cursor-pointer">Add</button>
+              </div>
+            </div>
+            <div class="w-full bg-slate-950/40 border border-slate-800 rounded-2xl p-4 max-h-36 overflow-y-auto space-y-2">
+              ${G.players.length === 0 ? `<div class="text-xs text-center text-slate-500 py-4">No players added yet. Add at least 3 players.</div>` : ''}
+              ${G.players.map((p, i) => `
+                <div class="flex items-center justify-between bg-slate-900/90 border border-slate-800 rounded-xl px-4 py-2.5 text-sm">
+                  <span class="font-semibold text-slate-200">${i+1}. ${p.name}</span>
+                  <button onclick="removePlayer(${i})" class="text-red-400 hover:text-red-300 text-xs font-bold px-2 py-1 cursor-pointer">Remove</button>
+                </div>
+              `).join('')}
+            </div>
+            <div class="flex gap-3 w-full pt-2">
+              <button onclick="G.phase='mode_select'; renderState();" class="w-1/3 py-3.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-sm transition-all cursor-pointer">Back</button>
+              <button onclick="startGame()" ${isInvalidSetup || G.players.length < 3 ? 'disabled class="w-2/3 py-3.5 bg-slate-800 text-slate-500 font-bold rounded-xl text-sm cursor-not-allowed opacity-60"' : 'class="w-2/3 py-3.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-sm shadow-lg glow-blue transition-all cursor-pointer"'}>Start Game (${G.players.length})</button>
+            </div>
+          </div>
+        `;
+      } else {
+        const myPlayer = G.players.find(p => p.id === G.myPlayerId);
+        const isReady = myPlayer ? myPlayer.ready : false;
+
+        return `
+          <div class="flex flex-col items-center w-full space-y-4">
+            ${settingsHTML}
+            ${warningHTML}
+            ${G.roomCode ? `
+              <div class="bg-slate-950/80 border border-indigo-500/40 p-3.5 rounded-2xl text-center w-full">
+                <span class="text-xs text-slate-400 uppercase tracking-widest block mb-0.5">Room Code</span>
+                <span class="text-3xl font-extrabold text-indigo-400 tracking-widest">${G.roomCode}</span>
+              </div>
+            ` : `
+              <div class="w-full space-y-3 text-left">
+                <label class="text-xs font-bold text-slate-300 uppercase tracking-wider block">Your Name / Handle <span class="text-red-400">*</span></label>
+                <input type="text" id="handleInput" placeholder="Enter your name first..." class="w-full bg-slate-900/80 border border-slate-700/80 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-500 text-white placeholder-slate-500" onkeyup="checkHandleInput(this.value)">
+                <div id="nameRequiredError" class="text-[11px] text-amber-400 font-bold hidden">⚠️ Please enter your name before creating or joining a room.</div>
+                <div class="grid grid-cols-2 gap-3">
+                  <button id="createRoomBtn" onclick="createOnlineRoom()" class="py-3.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-sm transition-all cursor-pointer">Create Room</button>
+                  <button id="joinRoomBtn" onclick="openJoinModal()" class="py-3.5 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl text-sm transition-all cursor-pointer">Join Room</button>
+                </div>
+              </div>
+            `}
+            <div class="w-full bg-slate-950/40 border border-slate-800 rounded-2xl p-4 max-h-36 overflow-y-auto space-y-2">
+              <span class="text-xs text-slate-400 font-bold uppercase tracking-wider block mb-2">Connected Players</span>
+              ${G.players.map(p => `
+                <div class="flex items-center justify-between bg-slate-900/90 border border-slate-800 rounded-xl px-4 py-2 text-sm">
+                  <span class="font-semibold text-slate-200">${p.name} ${p.id === G.myPlayerId ? '(You)' : ''}</span>
+                  <div class="flex items-center gap-2">
+                    ${p.id === G.myPlayerId && G.isHost ? '<span class="text-xs bg-indigo-950 text-indigo-400 border border-indigo-800 px-2 py-0.5 rounded-full font-bold">HOST</span>' : ''}
+                    <span class="text-xs px-2.5 py-1 rounded-full font-extrabold ${p.ready ? 'bg-emerald-950 text-emerald-400 border border-emerald-500/50' : 'bg-slate-800 text-slate-500'}">
+                      ${p.ready ? 'READY' : 'NOT READY'}
+                    </span>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+
+            ${G.roomCode ? `
+              <button onclick="toggleReadyState()" class="w-full py-3 bg-slate-800 hover:bg-slate-700 border ${isReady ? 'border-emerald-500 text-emerald-400' : 'border-slate-600 text-white'} font-extrabold text-sm rounded-xl transition-all cursor-pointer relative z-20">
+                ${isReady ? '✓ YOU ARE READY (Click to Unready)' : 'CLICK TO READY UP'}
+              </button>
+            ` : ''}
+
+            ${G.isHost && G.roomCode ? `
+              <button onclick="startGame()" ${isInvalidSetup || G.players.length < 3 || !allReady ? 'disabled class="w-full py-3.5 bg-slate-800 text-slate-500 font-bold rounded-xl text-sm cursor-not-allowed opacity-60"' : 'class="w-full py-3.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-sm shadow-lg glow-blue transition-all cursor-pointer"'}>Start Multi-Device Game</button>
+            ` : ''}
+            <button onclick="G.phase='mode_select'; renderState();" class="text-xs text-slate-400 hover:text-white transition-colors pt-1 cursor-pointer">&larr; Back to Main Screen</button>
+          </div>
+        `;
+      }
+    }
+
+    function addPassPlayer() {
+      const input = document.getElementById('playerNameInput');
+      if (!input || !input.value.trim()) return;
+      sfx.click();
+      G.players.push({
+        id: 'p_' + Math.random().toString(36).substr(2, 9),
+        name: input.value.trim(),
+        role: '',
+        ready: true,
+        alive: true
+      });
+      input.value = '';
+      renderState();
+    }
+
+    function removePlayer(idx) {
+      sfx.click();
+      G.players.splice(idx, 1);
+      renderState();
+    }
+
+    function checkHandleInput(val) {
+      const err = document.getElementById('nameRequiredError');
+      if (err && val.trim().length > 0) {
+        err.classList.add('hidden');
+      }
+    }
+
+    function getValidatedHandle() {
+      const handleInput = document.getElementById('handleInput');
+      const name = handleInput ? handleInput.value.trim() : '';
+      const err = document.getElementById('nameRequiredError');
+      if (!name) {
+        if (err) err.classList.remove('hidden');
+        if (handleInput) handleInput.focus();
+        return null;
+      }
+      if (err) err.classList.add('hidden');
+      return name;
+    }
+
+    async function createOnlineRoom() {
+      const name = getValidatedHandle();
+      if (!name) return;
+      
+      sfx.click();
+      G.roomCode = generateCode();
+      G.myPlayerId = 'p_' + Math.random().toString(36).substr(2, 9);
+      G.isHost = true;
+      G.players = [{ id: G.myPlayerId, name: name, role: '', ready: true, alive: true }];
+      
+      const createdId = await initPeer('imposter_room_' + G.roomCode);
+      if (!createdId) {
+        G.roomCode = generateCode();
+        await initPeer('imposter_room_' + G.roomCode);
+      }
+      renderState();
+    }
+
+    function openJoinModal() {
+      const name = getValidatedHandle();
+      if (!name) return;
+
+      sfx.click();
+      const modal = document.getElementById('joinModal');
+      const input = document.getElementById('modalRoomCodeInput');
+      if (modal && input) {
+        input.value = '';
+        modal.classList.remove('hidden');
+        input.focus();
+      }
+    }
+
+    function closeJoinModal() {
+      sfx.click();
+      const modal = document.getElementById('joinModal');
+      if (modal) modal.classList.add('hidden');
+    }
+
+    async function submitJoinModal() {
+      const name = getValidatedHandle();
+      if (!name) return;
+
+      const input = document.getElementById('modalRoomCodeInput');
+      const code = input ? input.value.trim() : '';
+      if (!code || code.length < 4) return;
+      
+      closeJoinModal();
+      sfx.click();
+      G.roomCode = code.toUpperCase();
+      G.myPlayerId = 'p_' + Math.random().toString(36).substr(2, 9);
+      G.isHost = false;
+      
+      await initPeer();
+      const hostPeerId = 'imposter_room_' + G.roomCode;
+      
+      try {
+        const conn = peer.connect(hostPeerId, { reliable: true });
+        if (conn) {
+          if (!peerConns.some(c => c.peer === conn.peer)) {
+            peerConns.push(conn);
+          }
+          conn.on('open', () => {
+            conn.send({
+              type: 'JOIN_REQUEST',
+              player: { id: G.myPlayerId, name: name, role: '', ready: false, alive: true }
+            });
+          });
+          conn.on('data', (data) => handleIncomingData(data, conn));
+          conn.on('error', () => {});
+        }
+      } catch (err) {}
+      renderState();
+    }
+
+    function setImposterCount(count) {
+      sfx.click();
+      G.imposterCountMode = count;
+      if (G.netMode === 'online') broadcastState();
+      else renderState();
+    }
+
+    function startGame() {
+      if (G.players.length < 3) return;
+      sfx.gong();
+      assignRoles();
+      G.currentRevealIdx = 0;
+      G.showCardModal = false;
+      G.phase = 'reveal';
+      if (G.netMode === 'online') broadcastState();
+      else renderState();
+    }
+
+    function renderReveal() {
+      const myPlayer = G.players.find(p => p.id === G.myPlayerId) || G.players[0];
+      const p = G.netMode === 'online' ? myPlayer : G.players[G.currentRevealIdx];
+      const isMafiaMode = G.mode === 'mafia';
+
+      let roleTitle = '';
+      let roleDesc = '';
+      let isBad = false;
+
+      if (isMafiaMode) {
+        if (p && p.role === 'mafia') {
+          roleTitle = 'MAFIA';
+          roleDesc = 'Secretly eliminate players each night and deceive the group during debates!';
+          isBad = true;
+        } else {
+          roleTitle = 'CIVILIAN';
+          roleDesc = 'Identify suspicious patterns, defend yourself, and vote out the Mafia!';
+        }
+      } else {
+        if (p && p.role === 'murderer') {
+          roleTitle = 'MURDERER';
+          roleDesc = 'Secretly choose victims each night and cover your tracks during manor investigations!';
+          isBad = true;
+        } else {
+          roleTitle = 'MANOR GUEST';
+          roleDesc = 'Examine clues, analyze alibis, and find out who committed the murder!';
+        }
+      }
+
+      const partners = G.players
+        .filter(x => p && x.id !== p.id && (x.role === 'mafia' || x.role === 'murderer'))
+        .map(x => x.name);
+
+      if (G.netMode === 'online') {
+        return `
+          <div class="flex flex-col items-center text-center space-y-6 w-full">
+            <div class="w-full bg-slate-950/60 border border-slate-800 rounded-3xl p-6 flex flex-col items-center">
+              <span class="text-xs text-slate-400 uppercase tracking-widest font-bold">ONLINE DEVICE ROLE</span>
+              <h2 class="text-3xl font-extrabold text-white mt-1">${p ? p.name : 'Player'}</h2>
+              <p class="text-xs text-slate-400 mt-2">Keep your device screen hidden from other players!</p>
+            </div>
+
+            ${!G.showCardModal ? `
+              <button onclick="G.showCardModal=true; sfx.click(); renderState();" class="w-full py-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-extrabold text-base rounded-2xl shadow-xl hover:opacity-95 transition-all glow-blue cursor-pointer">
+                VIEW MY SECRET ROLE CARD
+              </button>
+            ` : `
+              <div class="w-full bg-slate-950/80 border ${isBad ? 'border-red-500/50' : 'border-emerald-500/50'} rounded-3xl p-6 flex flex-col items-center">
+                <span class="text-xs font-bold uppercase tracking-widest text-slate-400 mb-1">YOUR SECRET ROLE</span>
+                <h3 class="text-3xl font-black ${isBad ? 'text-red-400' : 'text-emerald-400'} mb-2">${roleTitle}</h3>
+                <p class="text-xs text-slate-300 max-w-xs mb-4 leading-relaxed">${roleDesc}</p>
+                ${isBad && partners.length > 0 ? `
+                  <div class="w-full bg-slate-900/90 border border-red-900/40 rounded-xl p-3 mb-4">
+                    <span class="text-xs text-red-400 font-bold block">PARTNERS IN CRIME:</span>
+                    <span class="text-sm font-semibold text-white">${partners.join(', ')}</span>
+                  </div>
+                ` : ''}
+                ${G.isHost ? `
+                  <button onclick="startDiscussion()" class="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-sm transition-all cursor-pointer">Start Discussion Phase &rarr;</button>
+                ` : `
+                  <p class="text-xs text-indigo-400 font-bold animate-pulse mt-2">Waiting for Host to start discussion...</p>
+                `}
+              </div>
+            `}
+          </div>
+        `;
+      }
+
+      return `
+        <div class="flex flex-col items-center text-center space-y-6 w-full">
+          <div class="w-full bg-slate-950/60 border border-slate-800 rounded-3xl p-6 flex flex-col items-center">
+            <span class="text-xs text-slate-400 uppercase tracking-widest font-bold">PASS PHONE TO</span>
+            <h2 class="text-3xl font-extrabold text-white mt-1">${p ? p.name : 'Player'}</h2>
+            <p class="text-xs text-slate-400 mt-2">Keep your secret card hidden!</p>
+          </div>
+
+          ${!G.showCardModal ? `
+            <button onclick="G.showCardModal=true; sfx.click(); renderState();" class="w-full py-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-extrabold text-base rounded-2xl shadow-xl hover:opacity-95 transition-all glow-blue cursor-pointer">
+              VIEW SECRET ROLE CARD
+            </button>
+          ` : `
+            <div class="w-full bg-slate-950/80 border ${isBad ? 'border-red-500/50' : 'border-emerald-500/50'} rounded-3xl p-6 flex flex-col items-center">
+              <span class="text-xs font-bold uppercase tracking-widest text-slate-400 mb-1">YOUR SECRET ROLE</span>
+              <h3 class="text-3xl font-black ${isBad ? 'text-red-400' : 'text-emerald-400'} mb-2">${roleTitle}</h3>
+              <p class="text-xs text-slate-300 max-w-xs mb-4 leading-relaxed">${roleDesc}</p>
+              ${isBad && partners.length > 0 ? `
+                <div class="w-full bg-slate-900/90 border border-red-900/40 rounded-xl p-3 mb-4">
+                  <span class="text-xs text-red-400 font-bold block">PARTNERS IN CRIME:</span>
+                  <span class="text-sm font-semibold text-white">${partners.join(', ')}</span>
+                </div>
+              ` : ''}
+              <button onclick="nextReveal()" class="w-full py-3 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl text-sm transition-all cursor-pointer">Hide Card & Pass Phone</button>
+            </div>
+          `}
+        </div>
+      `;
+    }
+
+    function nextReveal() {
+      sfx.click();
+      G.showCardModal = false;
+      if (G.currentRevealIdx + 1 < G.players.length) {
+        G.currentRevealIdx++;
+        renderState();
+      } else {
+        startDiscussion();
+      }
+    }
+
+    function startDiscussion() {
+      G.phase = 'discussion';
+      G.discussionTimeLeft = G.mode === 'mafia' ? 300 : 180;
+      G.currentPrompt = getRandomPrompt();
+      if (G.netMode === 'online') broadcastState();
+      else renderState();
+      startDiscussionTimer();
+    }
+
+    function startDiscussionTimer() {
+      if (G.timerInterval) clearInterval(G.timerInterval);
+      G.timerInterval = setInterval(() => {
+        if (G.discussionTimeLeft > 0) {
+          G.discussionTimeLeft--;
+          renderTimerDisplay();
+        } else {
+          clearInterval(G.timerInterval);
+          handleDiscussionEnd();
+        }
+      }, 1000);
+    }
+
+    function renderTimerDisplay() {
+      const el = document.getElementById('timerMinutes');
+      if (!el) return;
+      const m = Math.floor(G.discussionTimeLeft / 60);
+      const s = G.discussionTimeLeft % 60;
+      el.textContent = `${m}:${s < 10 ? '0' : ''}${s}`;
+    }
+
+    function renderDiscussion() {
+      const m = Math.floor(G.discussionTimeLeft / 60);
+      const s = G.discussionTimeLeft % 60;
+
+      return `
+        <div class="flex flex-col items-center text-center space-y-6 w-full">
+          <div class="relative w-24 h-24 rounded-full bg-slate-950 border-2 border-indigo-500/50 flex flex-col items-center justify-center glow-indigo">
+            <span id="timerMinutes" class="text-2xl font-black text-indigo-400 tracking-wider">${m}:${s < 10 ? '0' : ''}${s}</span>
+          </div>
+          <div>
+            <div class="inline-block px-3 py-1 bg-indigo-950 border border-indigo-500/30 text-indigo-300 text-[10px] font-bold uppercase rounded-full mb-1">
+              Round ${G.roundCount} • Debate & Accusations
+            </div>
+            <h2 class="text-2xl font-black text-white">${G.mode === 'mafia' ? '5-MINUTE DEBATE' : '3-MINUTE MANOR INVESTIGATION'}</h2>
+          </div>
+          <div class="w-full bg-indigo-950/40 border border-indigo-500/30 rounded-2xl p-4 text-left space-y-1">
+            <div class="flex items-center justify-between">
+              <span class="text-[10px] text-indigo-400 font-bold uppercase tracking-wider">Interrogation Prompt</span>
+              <button onclick="shufflePrompt()" class="text-[10px] text-indigo-300 hover:text-white underline font-semibold cursor-pointer">Shuffle Prompt</button>
+            </div>
+            <p id="interrogationPromptText" class="text-sm font-bold text-white">${G.currentPrompt}</p>
+          </div>
+          <div class="w-full bg-slate-950/40 border border-slate-800 rounded-2xl p-4 max-h-32 overflow-y-auto space-y-2">
+            <span class="text-xs text-slate-400 font-bold uppercase tracking-wider block mb-1">Living Players</span>
+            <div class="grid grid-cols-2 gap-2">
+              ${G.players.map(p => `
+                <div class="flex items-center gap-2 p-2 rounded-xl ${p.alive ? 'bg-slate-900 border border-slate-800 text-slate-200' : 'bg-red-950/30 border border-red-900/40 text-red-500/60 line-through'} text-xs font-semibold">
+                  <div class="w-2 h-2 rounded-full ${p.alive ? 'bg-emerald-400' : 'bg-red-500'}"></div>
+                  <span>${p.name}</span>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+          <button onclick="skipDiscussionTimer()" class="w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold text-sm rounded-xl transition-all shadow-lg glow-indigo cursor-pointer">
+            PROCEED TO ${G.mode === 'mafia' ? 'VOTING' : 'NIGHT PHASE'} &rarr;
+          </button>
+        </div>
+      `;
+    }
+
+    function shufflePrompt() {
+      sfx.click();
+      G.currentPrompt = getRandomPrompt();
+      const el = document.getElementById('interrogationPromptText');
+      if (el) el.textContent = G.currentPrompt;
+      if (G.netMode === 'online') broadcastState();
+    }
+
+    function skipDiscussionTimer() {
+      sfx.click();
+      if (G.timerInterval) clearInterval(G.timerInterval);
+      handleDiscussionEnd();
+    }
+
+    function handleDiscussionEnd() {
+      if (G.mode === 'mafia') {
+        goVoteBallot();
+      } else {
+        goToNightApproaching();
+      }
+    }
+
+    function goVoteBallot() {
+      G.phase = 'vote_ballot';
+      G.votes = {};
+      G.currentVoterIdx = 0;
+      G.voteTimeLeft = 120;
+      if (G.netMode === 'online') broadcastState();
+      else renderState();
+      startVoteTimer();
+    }
+
+    function startVoteTimer() {
+      if (G.voteTimerInterval) clearInterval(G.voteTimerInterval);
+      G.voteTimerInterval = setInterval(() => {
+        if (G.voteTimeLeft > 0) {
+          G.voteTimeLeft--;
+          renderVoteTimerDisplay();
+        } else {
+          clearInterval(G.voteTimerInterval);
+          if (G.isHost) tallyVotesAndEliminate();
+        }
+      }, 1000);
+    }
+
+    function renderVoteTimerDisplay() {
+      const el = document.getElementById('voteTimerMinutes');
+      if (!el) return;
+      const m = Math.floor(G.voteTimeLeft / 60);
+      const s = G.voteTimeLeft % 60;
+      el.textContent = `${m}:${s < 10 ? '0' : ''}${s}`;
+    }
+
+    function renderVoteBallot() {
+      const livingPlayers = G.players.filter(p => p.alive);
+
+      if (G.netMode === 'online') {
+        const myPlayer = G.players.find(p => p.id === G.myPlayerId);
+        const hasVoted = myPlayer && G.votes[myPlayer.id];
+
+        const m = Math.floor(G.voteTimeLeft / 60);
+        const s = G.voteTimeLeft % 60;
+
+        return `
+          <div class="flex flex-col items-center text-center space-y-6 w-full animate-fade-in">
+            <div class="relative w-20 h-20 rounded-full bg-slate-950 border-2 border-indigo-500/50 flex flex-col items-center justify-center glow-indigo">
+              <span id="voteTimerMinutes" class="text-xl font-black text-indigo-400 tracking-wider">${m}:${s < 10 ? '0' : ''}${s}</span>
+            </div>
+            <div>
+              <span class="text-xs font-bold text-slate-400 uppercase tracking-widest block">ROUND ${G.roundCount} BALLOT</span>
+              <h2 class="text-2xl font-black text-white mt-1">CAST YOUR SECRET VOTE</h2>
+              <p class="text-xs text-indigo-400 mt-1 font-semibold">
+                ${Object.keys(G.votes).length} of ${livingPlayers.length} votes submitted
+              </p>
+            </div>
+
+            ${!myPlayer || !myPlayer.alive ? `
+              <div class="w-full bg-red-950/40 border border-red-800/60 p-4 rounded-2xl text-red-300 text-xs font-bold">
+                👻 You are eliminated! Observing live vote count...
+              </div>
+            ` : hasVoted ? `
+              <div class="w-full bg-slate-950/80 border border-emerald-500/50 p-6 rounded-3xl flex flex-col items-center space-y-2">
+                <span class="text-2xl">✅</span>
+                <span class="text-sm font-extrabold text-emerald-400">VOTE SUBMITTED!</span>
+                <p class="text-xs text-slate-400 max-w-xs">Waiting for other players to submit their vote or timer to conclude...</p>
+              </div>
+            ` : `
+              <div class="w-full space-y-2 max-h-48 overflow-y-auto">
+                ${livingPlayers.map(target => `
+                  <button onclick="submitOnlineVote('${target.id}')" class="w-full p-3.5 bg-slate-900 hover:bg-slate-800 border border-slate-700 hover:border-indigo-500 text-slate-200 font-bold text-sm rounded-xl flex items-center justify-between transition-all cursor-pointer">
+                    <span>${target.name}</span>
+                    <span class="text-xs text-slate-400 font-semibold">Vote Out &rarr;</span>
+                  </button>
+                `).join('')}
+              </div>
+            `}
+
+            ${G.isHost ? `
+              <button onclick="skipVoteTimer()" class="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold text-xs rounded-xl transition-all shadow-md cursor-pointer">
+                Skip Timer & Force Tally &rarr;
+              </button>
+            ` : ''}
+          </div>
+        `;
+      }
+
+      const currentVoter = livingPlayers[G.currentVoterIdx];
+      return `
+        <div class="flex flex-col items-center text-center space-y-6 w-full animate-fade-in">
+          <div>
+            <span class="text-xs font-bold text-slate-400 uppercase tracking-widest block">PASS PHONE VOTE</span>
+            <h2 class="text-2xl font-black text-white mt-1">${currentVoter ? currentVoter.name : 'Voter'}'s Turn</h2>
+            <p class="text-xs text-slate-400 mt-1">Cast your vote secretly without showing the group!</p>
+          </div>
+          <div class="w-full space-y-2 max-h-48 overflow-y-auto">
+            ${livingPlayers.map(target => `
+              <button onclick="submitPassVote('${target.id}')" class="w-full p-3.5 bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 font-bold text-sm rounded-xl flex items-center justify-between transition-all cursor-pointer">
+                <span>${target.name}</span>
+                <span class="text-xs text-slate-400 font-semibold">Vote &rarr;</span>
+              </button>
+            `).join('')}
+          </div>
+        </div>
+      `;
+    }
+
+    function submitOnlineVote(targetId) {
+      sfx.click();
+      G.votes[G.myPlayerId] = targetId;
+      if (!G.isHost) {
+        const hostConn = peerConns.find(c => c && c.open);
+        if (hostConn) hostConn.send({ type: 'CAST_VOTE', voterId: G.myPlayerId, targetId: targetId });
+      } else {
+        const livingPlayers = G.players.filter(p => p.alive);
+        if (Object.keys(G.votes).length >= livingPlayers.length) {
+          if (G.voteTimerInterval) clearInterval(G.voteTimerInterval);
+          tallyVotesAndEliminate();
+        } else {
+          broadcastState();
+        }
+      }
+      renderState();
+    }
+
+    function submitPassVote(targetId) {
+      sfx.click();
+      const livingPlayers = G.players.filter(p => p.alive);
+      const voter = livingPlayers[G.currentVoterIdx];
+      G.votes[voter.id] = targetId;
+
+      if (G.currentVoterIdx + 1 < livingPlayers.length) {
+        G.currentVoterIdx++;
+        renderState();
+      } else {
+        if (G.voteTimerInterval) clearInterval(G.voteTimerInterval);
+        tallyVotesAndEliminate();
+      }
+    }
+
+    function skipVoteTimer() {
+      sfx.click();
+      if (G.voteTimerInterval) clearInterval(G.voteTimerInterval);
+      tallyVotesAndEliminate();
+    }
+
+    function goToNightApproaching() {
+      G.phase = 'night_approaching';
+      if (G.netMode === 'online') broadcastState();
+      else renderState();
+      sfx.elim();
+    }
+
+    function renderNightApproaching() {
+      return `
+        <div class="flex flex-col items-center text-center space-y-6 w-full">
+          <div class="w-20 h-20 rounded-full bg-slate-950 border-2 border-indigo-500/60 flex items-center justify-center text-indigo-400 shadow-xl">
+            <span class="text-3xl">🌙</span>
+          </div>
+          <div>
+            <h2 class="text-2xl font-black text-indigo-400">NIGHT PHASE — ROUND ${G.roundCount}</h2>
+            <p class="text-xs text-slate-300 mt-1">Night is approaching. One manor guest will be eliminated. Guests, close your eyes!</p>
+          </div>
+          <button onclick="goToOpenEyes()" class="w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold text-sm rounded-xl shadow-lg glow-indigo transition-all cursor-pointer">
+            Open Murderer's Eyes &rarr;
+          </button>
+        </div>
+      `;
+    }
+
+    function goToOpenEyes() {
+      sfx.click();
+      G.phase = 'murderers_open_eyes';
+      G.murdererTargetId = null;
+      if (G.netMode === 'online') broadcastState();
+      else renderState();
+    }
+
+    function renderMurderersOpenEyes() {
+      const myPlayer = G.players.find(p => p.id === G.myPlayerId);
+      const isBadGuy = myPlayer && (myPlayer.role === 'murderer' || myPlayer.role === 'mafia');
+
+      if (G.netMode === 'online' && !isBadGuy) {
+        return `
+          <div class="flex flex-col items-center text-center space-y-6 w-full animate-fade-in py-4">
+            <div class="w-20 h-20 rounded-full bg-slate-950 border-2 border-indigo-500/60 flex items-center justify-center text-indigo-400 shadow-xl">
+              <span class="text-3xl">🌙</span>
+            </div>
+            <div>
+              <h2 class="text-2xl font-black text-indigo-400 uppercase">NIGHT PHASE IN PROGRESS</h2>
+              <p class="text-xs text-slate-300 mt-2 max-w-xs mx-auto">Keep your eyes closed! The murderer/mafia is choosing a target on their device...</p>
+            </div>
+            <div class="w-full bg-slate-950/60 border border-slate-800/80 p-4 rounded-2xl">
+              <span class="text-xs font-bold text-indigo-300 animate-pulse block">Waiting for night choices to complete...</span>
+            </div>
+          </div>
+        `;
+      }
+
+      const targets = G.players.filter(p => p.alive && p.role !== 'murderer' && p.role !== 'mafia');
+      return `
+        <div class="flex flex-col items-center text-center space-y-6 w-full">
+          <div class="w-20 h-20 rounded-full bg-slate-950 border-2 border-red-500/60 flex items-center justify-center text-red-400 shadow-xl">
+            <span class="text-3xl">🔪</span>
+          </div>
+          <div>
+            <h2 class="text-2xl font-black text-red-400">${G.mode === 'mafia' ? 'MAFIA SELECTION' : 'MURDERER SELECTION'}</h2>
+            <p class="text-xs text-slate-300 mt-1">Select a victim to eliminate tonight.</p>
+          </div>
+          <div class="w-full space-y-2 max-h-48 overflow-y-auto">
+            ${targets.map(p => `
+              <button onclick="selectNightTarget('${p.id}')" class="w-full p-3.5 ${G.murdererTargetId === p.id ? 'bg-red-600 border-red-400 text-white' : 'bg-slate-900 hover:bg-slate-800 border-slate-700 text-slate-200'} border rounded-xl flex items-center justify-between font-bold text-sm transition-all cursor-pointer">
+                <span>${p.name}</span>
+                ${G.murdererTargetId === p.id ? '<span class="text-xs uppercase tracking-widest bg-black/40 px-2 py-0.5 rounded-full">Selected Victim</span>' : ''}
+              </button>
+            `).join('')}
+          </div>
+          ${G.isHost ? `
+            <button onclick="concludeNightPhase()" ${!G.murdererTargetId ? 'disabled class="w-full py-3.5 bg-slate-800 text-slate-500 font-bold rounded-xl text-sm cursor-not-allowed"' : 'class="w-full py-3.5 bg-red-600 hover:bg-red-500 text-white font-extrabold text-sm rounded-xl shadow-lg glow-blue transition-all cursor-pointer"'}>
+              Confirm Night Elimination &rarr;
+            </button>
+          ` : `
+            <p class="text-xs font-bold text-red-400">Target selected! Waiting for host to confirm night...</p>
+          `}
+        </div>
+      `;
+    }
+
+    function selectNightTarget(id) {
+      sfx.click();
+      G.murdererTargetId = id;
+      if (G.netMode === 'online') {
+        if (!G.isHost) {
+          const hostConn = peerConns.find(c => c && c.open);
+          if (hostConn) hostConn.send({ type: 'SELECT_NIGHT_TARGET', targetId: id });
+        } else {
+          broadcastState();
+        }
+      } else {
+        renderState();
+      }
+    }
+
+    function concludeNightPhase() {
+      sfx.gong();
+      if (G.murdererTargetId) {
+        const victim = G.players.find(p => p.id === G.murdererTargetId);
+        if (victim) {
+          victim.alive = false;
+          G.lastEliminatedPlayer = victim;
+          G.lastEliminatedForfeit = getRandomForfeit();
+        }
+      }
+      goVoteBallot();
+    }
+
+    function tallyVotesAndEliminate() {
+      const counts = {};
+      Object.values(G.votes).forEach(tId => {
+        counts[tId] = (counts[tId] || 0) + 1;
+      });
+
+      let maxVotes = 0;
+      let eliminatedId = null;
+      let isTie = false;
+
+      Object.entries(counts).forEach(([tId, count]) => {
+        if (count > maxVotes) {
+          maxVotes = count;
+          eliminatedId = tId;
+          isTie = false;
+        } else if (count === maxVotes) {
+          isTie = true;
+        }
+      });
+
+      if (!isTie && eliminatedId) {
+        const p = G.players.find(x => x.id === eliminatedId);
+        if (p) {
+          p.alive = false;
+          G.lastEliminatedPlayer = p;
+          G.lastEliminatedForfeit = getRandomForfeit();
+          G.tiebreakerActive = false;
+        }
+      } else {
+        G.lastEliminatedPlayer = null;
+        const livingPlayers = G.players.filter(p => p.alive);
+        const badTeam = livingPlayers.filter(p => p.role === 'mafia' || p.role === 'murderer');
+        const goodTeam = livingPlayers.filter(p => p.role !== 'mafia' && p.role !== 'murderer');
+
+        if (livingPlayers.length === 2 && badTeam.length === 1 && goodTeam.length === 1) {
+          G.tiebreakerActive = true;
+        }
+      }
+
+      G.phase = 'vote_results';
+      if (G.netMode === 'online') broadcastState();
+      else renderState();
+    }
+
+    function resolveSuddenDeathCoinToss() {
+      sfx.gong();
+      const livingPlayers = G.players.filter(p => p.alive);
+      const loser = livingPlayers[Math.floor(Math.random() * livingPlayers.length)];
+      loser.alive = false;
+      G.lastEliminatedPlayer = loser;
+      G.lastEliminatedForfeit = "SUDDEN DEATH COIN FLIP: " + getRandomForfeit();
+      G.tiebreakerActive = false;
+      checkWinConditions();
+    }
+
+    function renderVoteResults() {
+      const livingPlayers = G.players.filter(p => p.alive);
+      const badTeam = livingPlayers.filter(p => p.role === 'mafia' || p.role === 'murderer');
+      const goodTeam = livingPlayers.filter(p => p.role !== 'mafia' && p.role !== 'murderer');
+
+      return `
+        <div class="flex flex-col items-center text-center space-y-6 w-full animate-fade-in">
+          <div>
+            <span class="text-xs font-bold text-slate-400 uppercase tracking-widest block">ROUND ${G.roundCount} VOTE CONCLUSION</span>
+            <h2 class="text-3xl font-black text-white mt-1">VOTING RESULTS</h2>
+          </div>
+          ${G.lastEliminatedPlayer ? `
+            <div class="w-full bg-red-950/40 border border-red-800/60 p-5 rounded-2xl flex flex-col items-center space-y-3">
+              <span class="text-xs text-red-400 font-bold uppercase tracking-widest">ELIMINATED BY GROUP VOTE</span>
+              <span class="text-2xl font-black text-white">${G.lastEliminatedPlayer.name}</span>
+              <span class="text-xs text-slate-300">True identity: <strong class="text-red-400 uppercase">${(G.lastEliminatedPlayer.role || '???').replace('_', ' ')}</strong></span>
+              <div class="w-full bg-slate-900 border border-red-900/40 p-3 rounded-xl text-left mt-2">
+                <span class="text-[10px] text-red-400 font-bold uppercase tracking-widest block mb-0.5">Game Forfeit:</span>
+                <p class="text-xs font-semibold text-slate-200">${G.lastEliminatedForfeit}</p>
+              </div>
+            </div>
+          ` : `
+            <div class="w-full bg-slate-900/90 border border-amber-500/50 p-5 rounded-2xl space-y-2">
+              <span class="text-xl font-black text-amber-400">STALEMATE TIE VOTE!</span>
+              <p class="text-xs text-slate-300">Neither player yielded their vote.</p>
+              ${G.tiebreakerActive ? `
+                <div class="mt-3 p-3 bg-red-950/70 border border-red-500/50 rounded-xl text-xs text-red-300 font-bold">
+                  ⚡ 1v1 DEADLOCK TRIGGERED! Flip a coin to force sudden death elimination!
+                </div>
+              ` : ''}
+            </div>
+          `}
+
+          <div class="w-full bg-slate-950/40 border border-slate-800 rounded-xl p-3 flex justify-between text-xs font-bold text-slate-300">
+            <span>Remaining Alive: ${livingPlayers.length}</span>
+            <span>(${goodTeam.length} ${G.mode === 'mafia' ? 'Civilians' : 'Guests'}, ${badTeam.length} ${G.mode === 'mafia' ? 'Mafia' : 'Murderers'})</span>
+          </div>
+
+          ${G.tiebreakerActive ? `
+            <button onclick="resolveSuddenDeathCoinToss()" class="w-full py-4 bg-red-600 hover:bg-red-500 text-white font-extrabold text-sm rounded-xl transition-all shadow-lg glow-blue cursor-pointer">
+              🎲 FLIP COIN FOR SUDDEN DEATH ELIMINATION &rarr;
+            </button>
+          ` : `
+            <button onclick="advanceRoundOrEnd()" class="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-sm rounded-xl transition-all shadow-lg glow-blue cursor-pointer">
+              CONTINUE GAME &rarr;
+            </button>
+          `}
+        </div>
+      `;
+    }
+
+    function advanceRoundOrEnd() {
+      sfx.click();
+      if (checkWinConditions()) return;
+
+      G.roundCount++;
+      if (G.mode === 'mafia') {
+        startDiscussion();
+      } else {
+        goToNightApproaching();
+      }
+    }
+
+    function checkWinConditions() {
+      const badTeam = G.players.filter(p => p.alive && (p.role === 'mafia' || p.role === 'murderer'));
+      const goodTeam = G.players.filter(p => p.alive && p.role !== 'mafia' && p.role !== 'murderer');
+
+      if (G.players.length === 0) return false;
+
+      if (badTeam.length === 0) {
+        G.winner = G.mode === 'mafia' ? 'CIVILIANS' : 'MANOR GUESTS';
+        G.phase = 'game_over';
+        if (G.netMode === 'online') broadcastState();
+        else renderState();
+        return true;
+      }
+
+      if (G.mode === 'murder_mystery' && goodTeam.length === 2 && badTeam.length === 1) {
+        G.winner = 'MANOR GUESTS';
+        G.phase = 'game_over';
+        if (G.netMode === 'online') broadcastState();
+        else renderState();
+        return true;
+      }
+
+      if (goodTeam.length === 0 || (badTeam.length === 2 && goodTeam.length === 1)) {
+        G.winner = G.mode === 'mafia' ? 'MAFIA' : 'MURDERER';
+        G.phase = 'game_over';
+        if (G.netMode === 'online') broadcastState();
+        else renderState();
+        return true;
+      }
+
+      return false;
+    }
+
+    function renderGameOver() {
+      const isBadWin = G.winner === 'MAFIA' || G.winner === 'MURDERER';
+      return `
+        <div class="flex flex-col items-center text-center space-y-6 w-full">
+          <div>
+            <span class="text-xs font-bold text-slate-400 uppercase tracking-widest block">GAME FINALE CONCLUDED</span>
+            <h2 class="text-4xl font-black ${isBadWin ? 'text-red-400' : 'text-emerald-400'} mt-1">${G.winner} WIN!</h2>
+          </div>
+          <div class="w-full bg-slate-950/60 border border-slate-800 rounded-2xl p-4 max-h-48 overflow-y-auto space-y-2">
+            <span class="text-xs text-slate-400 font-bold uppercase tracking-wider block mb-1">ALL PLAYER ROLES & FINAL STATUS</span>
+            ${G.players.map(p => `
+              <div class="flex items-center justify-between bg-slate-900/90 border border-slate-800 rounded-xl px-4 py-2 text-xs font-semibold">
+                <span class="text-white ${!p.alive ? 'line-through text-slate-500' : ''}">${p.name}</span>
+                <span class="${p.role === 'mafia' || p.role === 'murderer' ? 'text-red-400' : 'text-emerald-400'} uppercase font-bold">${(p.role || '???').replace('_', ' ')}</span>
               </div>
             `).join('')}
           </div>
