@@ -221,12 +221,18 @@
           let resolved = false;
           peer.on('open', (id) => { if (!resolved) { resolved = true; resolve(id); } });
           peer.on('connection', (conn) => {
+            // Avoid duplicate connection tracking
             if (!peerConns.some(c => c.peer === conn.peer)) {
               peerConns.push(conn);
             }
             conn.on('data', (data) => handleIncomingData(data, conn));
             conn.on('close', () => {
               peerConns = peerConns.filter(c => c !== conn);
+              // If host, remove player who disconnected
+              if (G.isHost && conn.peerPlayerId) {
+                G.players = G.players.filter(p => p.id !== conn.peerPlayerId);
+                broadcastState();
+              }
             });
             conn.on('error', () => {
               peerConns = peerConns.filter(c => c !== conn);
@@ -683,7 +689,13 @@
       G.myPlayerId = 'p_' + Math.random().toString(36).substr(2, 9);
       G.isHost = true;
       G.players = [{ id: G.myPlayerId, name: name, role: '', ready: true, alive: true }];
-      await initPeer('imposter_room_' + G.roomCode);
+      
+      const createdId = await initPeer('imposter_room_' + G.roomCode);
+      if (!createdId) {
+        // Fallback or retry logic if peer ID collision occurs
+        G.roomCode = generateCode();
+        await initPeer('imposter_room_' + G.roomCode);
+      }
       renderState();
     }
 
@@ -720,20 +732,25 @@
       G.roomCode = code.toUpperCase();
       G.myPlayerId = 'p_' + Math.random().toString(36).substr(2, 9);
       G.isHost = false;
+      
       await initPeer();
       const hostPeerId = 'imposter_room_' + G.roomCode;
+      
       try {
         const conn = peer.connect(hostPeerId, { reliable: true });
-        if (!peerConns.some(c => c.peer === conn.peer)) {
-          peerConns.push(conn);
-        }
-        conn.on('open', () => {
-          conn.send({
-            type: 'JOIN_REQUEST',
-            player: { id: G.myPlayerId, name: name, role: '', ready: false, alive: true }
+        if (conn) {
+          if (!peerConns.some(c => c.peer === conn.peer)) {
+            peerConns.push(conn);
+          }
+          conn.on('open', () => {
+            conn.send({
+              type: 'JOIN_REQUEST',
+              player: { id: G.myPlayerId, name: name, role: '', ready: false, alive: true }
+            });
           });
-        });
-        conn.on('data', (data) => handleIncomingData(data, conn));
+          conn.on('data', (data) => handleIncomingData(data, conn));
+          conn.on('error', () => {});
+        }
       } catch (err) {}
       renderState();
     }
