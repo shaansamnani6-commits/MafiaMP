@@ -176,7 +176,9 @@
       "Must sit facing the wall during the next interrogation round!",
       "Hand over your jacket or phone to the group until the game concludes!",
       "Must answer every question with a question for the next 2 rounds!",
-      "Must do 20 push-ups right now in the center of the room!"
+      "Must do 20 push-ups right now in the center of the room!",
+      "Must sing your answers in opera style for the next round!",
+      "Must speak only in whispers for the next two interrogation cycles!"
     ];
 
     const mafiaPrompts = [
@@ -184,7 +186,9 @@
       "Which player's voting pattern or reaction during the last cycle felt out of character?",
       "If the person to your left turns out to be part of the mafia, would you be surprised?",
       "Who is sitting quietly without contributing much to the group deduction?",
-      "Who do you trust the absolute least in this circle right now and why?"
+      "Who do you trust the absolute least in this circle right now and why?",
+      "Who changed their story or looked nervous when accused?",
+      "If you had to pick one person right now to banish from the group, who is it?"
     ];
 
     const murderMysteryPrompts = [
@@ -192,7 +196,9 @@
       "Who do you suspect most of wandering the halls alone last night?",
       "If you had to inspect one person right now for hidden motives, who would it be?",
       "Who is trying too hard to direct suspicion away from themselves?",
-      "Whose alibi or story about last night felt the most rehearsed or suspicious?"
+      "Whose alibi or story about last night felt the most rehearsed or suspicious?",
+      "Who was standing closest to the crime scene before lights went out?",
+      "Who reacted with fake shock when the elimination was announced?"
     ];
 
     function getRandomPrompt() {
@@ -613,7 +619,7 @@
             </div>
 
             ${G.roomCode ? `
-              <button onclick="toggleReadyState()" class="w-full py-3 bg-slate-800 hover:bg-slate-700 border ${isReady ? 'border-emerald-500 text-emerald-400' : 'border-slate-600 text-white'} font-extrabold text-sm rounded-xl transition-all cursor-pointer">
+              <button onclick="toggleReadyState()" class="w-full py-3 bg-slate-800 hover:bg-slate-700 border ${isReady ? 'border-emerald-500 text-emerald-400' : 'border-slate-600 text-white'} font-extrabold text-sm rounded-xl transition-all cursor-pointer relative z-20">
                 ${isReady ? '✓ YOU ARE READY (Click to Unready)' : 'CLICK TO READY UP'}
               </button>
             ` : ''}
